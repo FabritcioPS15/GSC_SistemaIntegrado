@@ -22,6 +22,7 @@ import DetailModal, {
   StandardModalFooter,
 
 } from '../../../shared/components/ui/DetailModal';
+import DateRangePicker from '../../../shared/components/ui/DateRangePicker';
 import { MaintenanceRecord, AssetWithMaintenanceHistory, PRIORITY_LABELS, BUSINESS_TYPE_LABELS } from '../../../shared/types/inventory.types';
 
 type MaintenanceProps = {
@@ -99,7 +100,7 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
 
       let query = supabase
         .from('maintenance_records')
-        .select('*, assets!inner(id, codigo_unico, item, brand, model, descripcion, serial_number, asset_types(*), locations(*)), locations!location_id(*)')
+        .select('*, assets!inner(id, location_id, codigo_unico, item, brand, model, descripcion, serial_number, asset_types(*), locations(*)), locations!location_id(*)')
         .order('completed_date', { ascending: false, nullsFirst: false });
 
       if (statusFilter.length > 0) query = query.in('status', statusFilter);
@@ -234,10 +235,10 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
   };
 
   const statusColors: Record<MaintenanceRecord['status'], string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    in_progress: 'bg-blue-100 text-blue-700',
-    completed: 'bg-emerald-100 text-emerald-700',
-    waiting_parts: 'bg-amber-100 text-amber-700',
+    pending: 'text-amber-600 font-semibold',
+    in_progress: 'text-blue-600 font-semibold',
+    completed: 'text-emerald-600 font-semibold',
+    waiting_parts: 'text-amber-600 font-semibold',
   };
 
   const typeLabels: Record<MaintenanceRecord['maintenance_type'], string> = {
@@ -312,8 +313,14 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
 
       const matchesStatus = statusFilter.length === 0 || statusFilter.includes(assetHistory.latestStatus);
       const matchesType = typeFilter.length === 0 || typeFilter.includes(assetHistory.latestMaintenanceType);
-      const matchesRubro = rubroFilter.length === 0 || rubroFilter.includes(assetHistory.asset.locations?.business_type ?? '');
-      const matchesLocation = locationFilter.length === 0 || locationFilter.includes(assetHistory.asset.location_id ?? '');
+      const matchesRubro = rubroFilter.length === 0 || (
+        !!assetHistory.asset.locations?.business_type && rubroFilter.includes(assetHistory.asset.locations.business_type)
+      );
+      const assetLocId = assetHistory.asset.location_id || assetHistory.asset.locations?.id;
+      const matchesLocation = locationFilter.length === 0 || (
+        (assetLocId ? locationFilter.includes(assetLocId) : false) ||
+        assetHistory.maintenanceRecords.some(r => r.location_id && locationFilter.includes(r.location_id))
+      );
       const matchesAsset = !assetFilter || assetHistory.asset.id === assetFilter;
       const matchesMachineType = machineTypeFilter.length === 0 || machineTypeFilter.includes(assetHistory.asset.asset_type_id ?? '');
 
@@ -367,7 +374,7 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
       const result = aValue < bValue ? -1 : 1;
       return sortConfig.direction === 'asc' ? result : -result;
     });
-  }, [assetsWithHistory, searchTerm, locationFilter, statusFilter, typeFilter, categoryFilter, machineTypeFilter, assetFilter, sortConfig, startDate, endDate]);
+  }, [assetsWithHistory, searchTerm, locationFilter, rubroFilter, statusFilter, typeFilter, categoryFilter, machineTypeFilter, assetFilter, sortConfig, startDate, endDate]);
 
   const totalPages = Math.ceil(sortedRecords.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -410,7 +417,7 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
   };
 
 
-  const hasActiveFilters = searchTerm || statusFilter.length > 0 || typeFilter.length > 0 || locationFilter.length > 0 || machineTypeFilter.length > 0 || categoryFilter || assetFilter || startDate || endDate;
+  const hasActiveFilters = searchTerm || statusFilter.length > 0 || typeFilter.length > 0 || rubroFilter.length > 0 || locationFilter.length > 0 || machineTypeFilter.length > 0 || categoryFilter || assetFilter || startDate || endDate;
 
   const handleExportPDF = () => {
     const data = sortedRecords.map((ah, i) => ({
@@ -653,26 +660,15 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
             }}
           />
 
-          <div className="flex flex-col sm:flex-row items-center gap-2 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
-            <div className="flex items-center pl-2 pr-1 text-slate-400">
-              <Calendar size={14} />
-            </div>
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => { setStartDate(e.target.value); setCurrentPage(1); }}
-              className="px-2 py-1.5 h-8 text-xs font-medium text-slate-600 bg-transparent outline-none transition-all cursor-pointer hover:text-[#002855] focus:text-[#002855]"
-              title="Fecha Inicial"
-            />
-            <span className="text-slate-300 text-xs hidden sm:block">-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={e => { setEndDate(e.target.value); setCurrentPage(1); }}
-              className="px-2 py-1.5 h-8 text-xs font-medium text-slate-600 bg-transparent outline-none transition-all cursor-pointer hover:text-[#002855] focus:text-[#002855]"
-              title="Fecha Final"
-            />
-          </div>
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(start, end) => {
+              setStartDate(start);
+              setEndDate(end);
+              setCurrentPage(1);
+            }}
+          />
 
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 

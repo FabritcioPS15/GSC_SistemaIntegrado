@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  *, ::before, ::after {
+    font-family: 'Exo 2', system-ui, -apple-system, sans-serif;
+  }
+
   :root {
     font-family: 'Exo 2', system-ui, -apple-system, sans-serif;
   }
@@ -13,6 +17,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: #f8f9fc;
+  }
+
+  button, input, optgroup, select, textarea {
+    font-family: 'Exo 2', system-ui, -apple-system, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {

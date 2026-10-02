@@ -2,6 +2,7 @@
 // TicketDetailPage.tsx — Página de detalle de un ticket individual
 // Funcionalidades:
 //   - Visualización completa del ticket (título, descripción, AnyDesk, estado)
+//   - Clasificación de complejidad técnica (N1/N2/N3) con escalamiento durante la atención
 //   - Chat en tiempo real con editor de texto enriquecido (negrita, cursiva, etc.)
 //   - Gestión de estados: Atender, Resolver, Cerrar, Finalizar (archivar)
 //   - Panel de participantes con presencia en tiempo real
@@ -10,9 +11,9 @@
 //   - Auto-asignación al creador vía ticket_assignments
 // =============================================================================
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, User, AlertCircle, MessageSquare, Copy, ArrowLeft, Lock, Smile, Bold, Italic, List, Image as ImageIcon, Loader2, Clock, Activity, CheckCircle2, XCircle, Underline, Strikethrough, Monitor, Eye, Briefcase, Terminal } from 'lucide-react';
+import { Send, User, AlertCircle, MessageSquare, Copy, ArrowLeft, Lock, Smile, Bold, Italic, List, Image as ImageIcon, Loader2, Clock, Activity, CheckCircle2, XCircle, Underline, Strikethrough, Monitor, Eye, Briefcase, Terminal, Layers, ChevronDown } from 'lucide-react';
 import { supabase } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { FaWhatsapp, FaTrashAlt } from "react-icons/fa";
@@ -22,6 +23,19 @@ import { useTicketComments } from '../hooks/useTicketComments';
 import { useTicketRealtime } from '../hooks/useTicketRealtime';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import QuickResponses from '../components/QuickResponses';
+import ComplexityBadge from '../components/ComplexityBadge';
+import {
+    COMPLEXITY_CASES,
+    COMPLEXITY_CATEGORY,
+    COMPLEXITY_DESCRIPTIONS,
+    COMPLEXITY_LABELS,
+    COMPLEXITY_LEVELS,
+    describeComplexityEstimate,
+    isComplexityEscalation,
+    normalizeComplexity,
+    resolveComplexityFromTitle,
+    TicketComplexity,
+} from '../tickets.types';
 
 export default function TicketDetail() {
     const { ticketId } = useParams();
@@ -36,6 +50,7 @@ export default function TicketDetail() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false); // Visibilidad del selector de emojis
     const [showListMenu, setShowListMenu] = useState(false); // Visibilidad del menú de listas
     const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false); // Visibilidad del modal de confirmación de finalización
+    const [showComplexityInfo, setShowComplexityInfo] = useState(false); // Visibilidad del detalle de complejidad (oculto por defecto)
     const [activeFormats, setActiveFormats] = useState<string[]>([]); // Formatos activos del editor (bold, italic, etc.)
     const [mobileTab, setMobileTab] = useState<'details' | 'chat' | 'people'>('chat'); // Pestaña activa en móvil
     const fileInputRef = useRef<HTMLInputElement>(null); // Referencia al input de archivos
@@ -445,6 +460,66 @@ export default function TicketDetail() {
         }
     };
 
+    // Cambia el nivel de complejidad técnica del ticket (solo área de Sistemas)
+    // El nivel inicial es una estimación del solicitante; durante la atención el
+    // técnico puede escalarlo (N1 → N2 → N3) si el diagnóstico revela una
+    // intervención de mayor nivel, o refinarlo a la baja.
+    // Cada cambio queda registrado como comentario de sistema en el feed del ticket,
+    // siguiendo el mismo patrón que los cambios de estado.
+    const handleComplexityChange = async (newLevel: TicketComplexity) => {
+        if (!canManageStatus || statusUpdating || !ticketId) {
+            return;
+        }
+
+        if (ticket.category !== COMPLEXITY_CATEGORY) {
+            notifyInfo('La complejidad técnica solo se clasifica en el área de Sistemas.', 'Clasificación');
+            return;
+        }
+
+        const currentLevel = normalizeComplexity(ticket.complexity_level);
+        if (currentLevel === newLevel) {
+            return;
+        }
+
+        try {
+            setStatusUpdating(true);
+
+            const { error } = await supabase
+                .from('tickets')
+                .update({ complexity_level: newLevel })
+                .eq('id', ticketId);
+
+            if (error) {
+                throw error;
+            }
+
+            const fromLabel = currentLevel ? COMPLEXITY_LABELS[currentLevel].toUpperCase() : 'SIN CLASIFICAR';
+            const escalated = isComplexityEscalation(ticket.complexity_level, newLevel);
+
+            await supabase.from('ticket_comments').insert([{
+                ticket_id: ticketId,
+                user_id: user?.id,
+                content: escalated
+                    ? `**ESCALADO**: La complejidad técnica subió de ${fromLabel} a ${COMPLEXITY_LABELS[newLevel].toUpperCase()} por ${user?.full_name}`
+                    : `**CLASIFICADO**: La complejidad técnica cambió de ${fromLabel} a ${COMPLEXITY_LABELS[newLevel].toUpperCase()} por ${user?.full_name}`,
+            }]);
+
+            notifySuccess(
+                escalated
+                    ? `Caso escalado a ${COMPLEXITY_LABELS[newLevel]}.`
+                    : `Nivel de complejidad actualizado a ${COMPLEXITY_LABELS[newLevel]}.`,
+                escalated ? 'Escalamiento registrado' : 'Clasificación actualizada'
+            );
+
+            await fetchTicket();
+            await fetchComments();
+        } catch (error) {
+            notifyError('Error al actualizar la complejidad: ' + (error as any)?.message || 'Error desconocido', 'Error');
+        } finally {
+            setStatusUpdating(false);
+        }
+    };
+
     const handleWhatsAppContact = () => {
         if (!ticket.requester?.email) return;
 
@@ -734,6 +809,21 @@ export default function TicketDetail() {
     const canAttendTicket = canManageStatus && ticket?.status === 'open';
     const isTicketCreator = user?.id === ticket?.requester_id;
 
+    // Nivel de complejidad vigente, ya normalizado y validado contra el catálogo
+    // (null si el ticket aún no fue clasificado)
+    const currentComplexity = normalizeComplexity(ticket?.complexity_level);
+
+    // Solo quien puede atender el ticket puede reclasificarlo por diagnóstico
+    // El solicitante que lo creó solo consulta el nivel estimado por el sistema
+    const canClassifyComplexity = canManageStatus && !isTicketCreator && ticket?.status !== 'archived';
+
+    // Razón de la estimación automática, recalculada desde el asunto persistido
+    // para poder explicarla en el detalle sin guardar datos adicionales
+    const complexityEstimateReason = useMemo(
+        () => describeComplexityEstimate(resolveComplexityFromTitle(ticket?.title, COMPLEXITY_CATEGORY)),
+        [ticket?.title]
+    );
+
     // Verificar si el ticket puede ser reabierto por el creador
     const canReopenTicket = isTicketCreator && ticket?.status === 'closed' && ticket?.closed_at;
     const timeSinceClosed = ticket?.closed_at ? Math.floor((new Date().getTime() - new Date(ticket.closed_at).getTime()) / (1000 * 60)) : 0;
@@ -820,6 +910,9 @@ export default function TicketDetail() {
                     <div className={`px-2 py-1 text-[10px] rounded-none font-semibold uppercase border ${getPriorityStyle(ticket.priority)}`}>
                         {getPriorityLabel(ticket.priority)}
                     </div>
+                    {ticket.category === COMPLEXITY_CATEGORY && (
+                        <ComplexityBadge level={ticket.complexity_level} variant="full" />
+                    )}
                 </div>
             </div>
 
@@ -880,6 +973,94 @@ export default function TicketDetail() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Clasificación de complejidad técnica */}
+                            {ticket.category === COMPLEXITY_CATEGORY && (
+                                <div>
+                                    <span className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest block border-b border-slate-200 pb-2 mb-3 flex items-center gap-2">
+                                        <Layers size={13} />
+                                        Complejidad Técnica
+                                    </span>
+
+                                    <div className="bg-white border border-slate-200 p-4">
+                                        {/* Nivel vigente + estado de edición */}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <ComplexityBadge level={ticket.complexity_level} variant="full" />
+                                            {!canClassifyComplexity && (
+                                                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest text-right">
+                                                    {isTicketCreator ? 'Solo lectura (solicitante)' : 'Solo lectura'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Combo para cambiar el nivel: la acción principal de la sección */}
+                                        {canClassifyComplexity && (
+                                            <div className="mt-3">
+                                                <label className="block text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">
+                                                    Cambiar nivel
+                                                </label>
+                                                <select
+                                                    value={currentComplexity ?? ''}
+                                                    onChange={(e) => {
+                                                        const next = e.target.value as TicketComplexity;
+                                                        if (next && next !== currentComplexity) {
+                                                            handleComplexityChange(next);
+                                                        }
+                                                    }}
+                                                    disabled={statusUpdating}
+                                                    className="w-full px-3 py-2 bg-white border border-slate-200 text-[11px] font-normal text-slate-700 focus:outline-none focus:border-[#002855]/30 disabled:opacity-50"
+                                                >
+                                                    {!currentComplexity && (
+                                                        <option value="" disabled>Sin clasificar</option>
+                                                    )}
+                                                    {COMPLEXITY_LEVELS.map((level) => (
+                                                        <option key={level} value={level}>
+                                                            {COMPLEXITY_LABELS[level]}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {/* Detalle oculto por defecto: descripción, casos y origen del nivel */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowComplexityInfo(prev => !prev)}
+                                            className="mt-3 flex items-center gap-1.5 text-[9px] font-semibold text-slate-400 uppercase tracking-widest hover:text-[#002855] transition-colors"
+                                        >
+                                            <ChevronDown
+                                                size={12}
+                                                className={`transition-transform ${showComplexityInfo ? 'rotate-180' : ''}`}
+                                            />
+                                            {showComplexityInfo ? 'Ocultar información' : 'Mostrar más información'}
+                                        </button>
+
+                                        {showComplexityInfo && (
+                                            <div className="mt-3 pt-3 border-t border-slate-100">
+                                                <p className="text-[11px] text-slate-600 leading-snug">
+                                                    {currentComplexity
+                                                        ? COMPLEXITY_DESCRIPTIONS[currentComplexity]
+                                                        : 'Sin clasificar. El nivel se define de acuerdo a la complejidad técnica del caso y puede escalarse durante la atención.'}
+                                                </p>
+
+                                                {currentComplexity && (
+                                                    <ul className="mt-3 space-y-1">
+                                                        {COMPLEXITY_CASES[currentComplexity].map((caso) => (
+                                                            <li key={caso} className="text-[10px] font-normal text-slate-400 uppercase tracking-wide leading-snug">
+                                                                · {caso}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+
+                                                <p className="mt-3 pt-3 border-t border-slate-100 text-[10px] font-normal text-slate-400 leading-snug">
+                                                    {complexityEstimateReason}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Gestión de Estado */}
                             <div>
@@ -997,6 +1178,8 @@ export default function TicketDetail() {
                                         c.content.includes('ATENDIENDO') ||
                                         c.content.includes('FINALIZADO') ||
                                         c.content.includes('REAPERTURA') ||
+                                        c.content.includes('ESCALADO') ||
+                                        c.content.includes('CLASIFICADO') ||
                                         c.content.includes('se ha unido al ticket') ||
                                         c.content.includes('asignado a');
 

@@ -294,7 +294,8 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
         model: a.model || '—',
         serial: a.serial_number || '—',
         location: a.locations?.name || '—',
-        area: a.areas?.name || a.area_ubicacion || '—',
+        area: a.areas?.name || a.area_ubicacion || 'Otros',
+        cost: a.valor_estimado != null ? `S/ ${Number(a.valor_estimado).toFixed(2)}` : (a.purchase_price != null ? `S/ ${Number(a.purchase_price).toFixed(2)}` : '—'),
         status: a.status || a.estado_uso || '—',
         purchase_date: a.fecha_adquisicion ? new Date(String(a.fecha_adquisicion).includes('T') ? String(a.fecha_adquisicion) : `${a.fecha_adquisicion}T12:00:00`).toLocaleDateString('es-PE') : '—',
         notes: a.notes || ''
@@ -317,6 +318,7 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
           { header: 'SERIE', key: 'serial', width: 20 },
           { header: 'UBICACIÓN', key: 'location', width: 25 },
           { header: 'ÁREA', key: 'area', width: 20 },
+          { header: 'COSTO (S/)', key: 'cost', width: 15 },
           { header: 'ESTADO', key: 'status', width: 15 },
           { header: 'FECHA ADQ.', key: 'purchase_date', width: 15 },
           { header: 'OBSERVACIONES', key: 'notes', width: 30 }
@@ -336,12 +338,13 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
       const filtros = buildExportFilters();
 
       const data = itemsToExport.map((a: any) => ({
-        code: a.codigo_unico || '—',
+        equipo: a.item || a.descripcion || a.subcategories?.name || '—',
         category: a.categories?.name || '—',
         marca_modelo: `${a.brand || ''} ${a.model || ''}`.trim() || '—',
         serial: a.serial_number || '—',
         location: a.locations?.name || '—',
-        status: a.status || '—'
+        area: a.areas?.name || a.area_ubicacion || 'Otros',
+        cost: a.valor_estimado != null ? `S/ ${Number(a.valor_estimado).toFixed(2)}` : (a.purchase_price != null ? `S/ ${Number(a.purchase_price).toFixed(2)}` : '—')
       }));
 
       await generatePDF({
@@ -352,12 +355,13 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
         filters: filtros,
         registros: itemsToExport.length,
         columns: [
-          { header: 'Código', key: 'code' },
+          { header: 'Nombre del Equipo', key: 'equipo' },
           { header: 'Categoría', key: 'category' },
           { header: 'Marca/Modelo', key: 'marca_modelo' },
           { header: 'Serie', key: 'serial' },
           { header: 'Ubicación', key: 'location' },
-          { header: 'Estado', key: 'status' }
+          { header: 'Área', key: 'area' },
+          { header: 'Costo (S/)', key: 'cost' }
         ],
         data
       });
@@ -713,7 +717,7 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
                           <TableCell>
                             <div className="flex flex-col min-w-0">
                               <TableCellPrimary className="truncate max-w-[180px]">{asset.locations?.name || 'No asignada'}</TableCellPrimary>
-                               <TableCellSecondary className="truncate max-w-[180px] mt-1">{asset.areas?.name || (asset as any).area_ubicacion || 'Sin área'}</TableCellSecondary>
+                               <TableCellSecondary className="truncate max-w-[180px] mt-1">{asset.areas?.name || (asset as any).area_ubicacion || 'Otros'}</TableCellSecondary>
                             </div>
                           </TableCell>
                           <TableCell className="whitespace-nowrap">

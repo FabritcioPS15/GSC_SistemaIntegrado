@@ -30,6 +30,8 @@ const ROUTE_LABELS: Record<string, string> = {
     'reports': 'Reportes',
     'painpoint': 'Puntos Críticos',
     'checklist': 'Checklist',
+    'comentarios': 'Comentarios',
+    'observaciones': 'Comentarios',
     'vacations': 'Vacaciones',
     'servers': 'Servidores',
     'flota-vehicular': 'Flota Vehicular',
@@ -917,7 +919,7 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
                             onClick={() => setShowActions(v => !v)}
 
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold tracking-widest transition-all ${showActions ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'}`}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold tracking-widest font-sans transition-all ${showActions ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'}`}
 
                         >
 
@@ -933,13 +935,13 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
                         {showActions && (
 
-                            <div className="absolute left-1/3 sm:right-0 top-full mt-2 w-80 sm:w-72 bg-[#001e3c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200] animate-in fade-in slide-in-from-top-2 duration-200 sm:left-auto left-1/3 sm:translate-x-0 -translate-x-1/3">
+                            <div className="absolute left-1/3 sm:right-0 top-full mt-2 w-80 sm:w-72 bg-[#001e3c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200] animate-in fade-in slide-in-from-top-2 duration-200 sm:left-auto left-1/3 sm:translate-x-0 -translate-x-1/3 font-sans">
 
                                 {pageActions.showSearch !== false && (
 
                                     <div className="p-4 border-b border-white/10">
 
-                                        <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.3em] mb-3">{pageActions.title}</p>
+                                        <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wider mb-3 font-sans">{pageActions.title}</p>
 
                                         <div className="relative">
 
@@ -987,7 +989,7 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
                                             onClick={() => { action.action(); setShowActions(false); }}
 
-                                            className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[12px] font-black tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-900/30"
+                                            className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[12px] font-semibold tracking-wide transition-all active:scale-95 shadow-lg shadow-blue-900/30 font-sans"
 
                                         >
 

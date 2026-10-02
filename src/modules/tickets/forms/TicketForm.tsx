@@ -2,6 +2,9 @@
 // TicketForm.tsx — Formulario de creación de nuevos tickets
 // Funcionalidades:
 //   - Campos: título, descripción, prioridad, categoría, sede, AnyDesk
+//   - El solicitante NO ve ni elige la complejidad técnica: se resuelve sola a
+//     partir del asunto (catálogo de problemas frecuentes o palabras clave)
+//   - El asunto es el campo principal porque define el tipo de soporte que recibe
 //   - Auto-sugerencia de problemas frecuentes al escribir el título
 //   - Auto-asignación de la sede del usuario actual
 //   - Validación de campos obligatorios antes de enviar
@@ -9,13 +12,19 @@
 //     auto-asigna al creador via ticket_assignments, y notifica a los roles
 // =============================================================================
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Send } from 'lucide-react';
 import { supabase } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import BaseForm, { FormSection, FormField, FormInput, FormSelect, FormTextarea } from '../../../shared/components/forms/BaseForm';
 import { notifyTicketCreated } from '../../../shared/services/notifications';
 import { useNotify } from '../../../shared/hooks/useNotify';
+import {
+  COMPLEXITY_CATEGORY,
+  DEFAULT_COMPLEXITY,
+  FREQUENT_TECH_ISSUES,
+  resolveComplexityFromTitle,
+} from '../tickets.types';
 
 // Props del componente
 // onClose: Función para cerrar el modal/formulario
@@ -24,18 +33,6 @@ type TicketFormProps = {
   onClose: () => void;
   onSave: () => void;
 };
-
-// Lista de problemas frecuentes para sugerencias automáticas
-// Ayuda a los usuarios a reportar incidencias comunes rápidamente
-// Cada sugerencia incluye: título, categoría, prioridad y descripción predefinida
-const FREQUENT_ISSUES = [
-  { title: 'Impresora no enciende / no imprime', category: 'sistemas', priority: 'critical', description: 'La impresora de la sede no responde a los comandos de impresión o está apagada.' },
-  { title: 'Olvidé mi contraseña de acceso del MTC / Correo', category: 'sistemas', priority: 'high', description: 'Requiero un reset de contraseña para ingresar al sistema.' },
-  { title: 'Sistema ERP está lento o se cierra', category: 'sistemas', priority: 'high', description: 'El sistema principal presenta lentitud extrema o cierres inesperados.' },
-  { title: 'Sin conexión a Internet en recepción', category: 'sistemas', priority: 'critical', description: 'Toda el área de recepción está sin conexión a red.' },
-  { title: 'Falla en cámara de seguridad', category: 'sistemas', priority: 'medium', description: 'Una de las cámaras no muestra imagen en el monitor.' },
-  { title: 'Configuración de correo corporativo', category: 'sistemas', priority: 'low', description: 'Solicito apoyo para configurar mi firma o bandeja de entrada.' },
-];
 
 export default function TicketForm({ onClose, onSave }: TicketFormProps) {
   const { user } = useAuth(); // Usuario actual autenticado
@@ -48,6 +45,7 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
 
   // Estado del formulario con valores iniciales
   // location_id se auto-asigna del usuario actual si está disponible
+  // La complejidad no vive aquí: se deriva del asunto en cada render
   const [formData, setFormData] = useState({
     title: '', // Título del incidente
     description: '', // Descripción detallada del problema
@@ -57,7 +55,7 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
     anydesk: '' // ID de AnyDesk opcional
   });
 
-  // Opciones de prioridad para el selector
+  // Opción de prioridad para el selector
   // Cada valor corresponde a un nivel SLA específico
   const priorities = [
     { value: 'critical', label: 'P1 - Crítica' }, // 4h SLA
@@ -74,6 +72,18 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
     { value: 'legal', label: 'Área legal' }, // Documentación legal
     { value: 'operaciones', label: 'Área de operaciones' }, // Procesos operativos
   ];
+
+  // La complejidad técnica solo tiene sentido para el área de Sistemas
+  // En las demás áreas el valor se ignora y no se envía al crear el ticket
+  const isComplexityApplicable = formData.category === COMPLEXITY_CATEGORY;
+
+  // El nivel se resuelve en vivo a partir del asunto sin mostrarlo al solicitante:
+  // primero busca el asunto en el listado de problemas frecuentes y, si es un
+  // caso personalizado, recurre a la estimación por palabras clave
+  const complexityEstimate = useMemo(
+    () => resolveComplexityFromTitle(formData.title, formData.category),
+    [formData.title, formData.category]
+  );
 
   // Carga la lista de sedes disponibles al montar el componente
   useEffect(() => {
@@ -121,18 +131,19 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
   }, []);
 
   // Filtra las sugerencias basándose en lo que el usuario escribe en el título
-  const filteredSuggestions = FREQUENT_ISSUES.filter(issue =>
+  const filteredSuggestions = FREQUENT_TECH_ISSUES.filter(issue =>
     issue.title.toLowerCase().includes(formData.title.toLowerCase())
   );
 
   // Selecciona una sugerencia de problema frecuente
   // Autocompleta el formulario con los datos predefinidos
-  const handleSelectIssue = (issue: typeof FREQUENT_ISSUES[0]) => {
+  // La complejidad no se copia: se resuelve sola desde el título elegido
+  const handleSelectIssue = (issue: typeof FREQUENT_TECH_ISSUES[0]) => {
     setFormData({
       ...formData,
       title: issue.title,
       description: issue.description,
-      category: issue.category,
+      category: COMPLEXITY_CATEGORY,
       priority: issue.priority
     });
     setShowSuggestions(false);
@@ -173,6 +184,9 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
 
     try {
       // Crear el ticket
+      // La complejidad NO se envía en el insert: se aplica después como
+      // actualización de mejor esfuerzo. Así una migración pendiente nunca
+      // impide crear el ticket (y tickets previos nunca se tocan).
       const { data: ticketData, error: submitError } = await supabase
         .from('tickets')
         .insert([
@@ -190,6 +204,17 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
         .single();
 
       if (submitError) throw submitError;
+
+      // Clasificar el caso de forma independiente: el nivel se resolvió a
+      // partir del asunto y solo aplica al área de Sistemas. Si la columna
+      // aún no existe en la base de datos (migración pendiente) el ticket
+      // queda sin clasificar, pero se creó de todas formas.
+      if (ticketData && isComplexityApplicable) {
+        await supabase
+          .from('tickets')
+          .update({ complexity_level: complexityEstimate.level ?? DEFAULT_COMPLEXITY })
+          .eq('id', ticketData.id);
+      }
 
       // Si se proporcionó AnyDesk, agregarlo como comentario para que sea detectado por el modal
       if (ticketData && formData.anydesk.trim()) {
@@ -289,17 +314,23 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
       >
       {/* Section: Información del Ticket */}
       <FormSection title="Detalles del Incidente" color="blue" columns={3}>
-          <FormField label="Asunto o Título" required error={errors.title} className="h-12 pt-0">
-            <div className="relative h-full mt-4" ref={suggestionRef}>
+          {/* El asunto ocupa todo el ancho: es el campo que define el tipo de
+              soporte que recibe el ticket, por eso va primero y destacado */}
+          <div className="sm:col-span-2 lg:col-span-3">
+            <span className="block text-[10px] font-medium text-slate-500 uppercase tracking-widest mb-2">
+              Asunto o Título <span className="text-red-500">*</span>
+            </span>
+
+            <div className="relative" ref={suggestionRef}>
               <FormInput
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
-                placeholder="Ej. No funciona el sistema de ventas..."
+                placeholder="Ej. La impresora de recepción no imprime"
                 required
                 error={errors.title}
-                className="h-full pt-2"
+                className="h-12 pt-3 text-[12px]"
               />
 
               {showSuggestions && formData.title && filteredSuggestions.length > 0 && (
@@ -315,13 +346,21 @@ export default function TicketForm({ onClose, onSave }: TicketFormProps) {
                         <span className="text-[12px] font-normal text-[#002855] uppercase">{issue.title}</span>
                         <span className="text-[12px] font-normal text-slate-400 uppercase tracking-widest mt-0.5">{issue.description.slice(0, 60)}...</span>
                       </div>
-                      <span className="text-[12px] font-normal text-slate-500">{issue.category}</span>
+                      <span className="text-[12px] font-normal text-slate-500">{COMPLEXITY_CATEGORY}</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
-          </FormField>
+
+            {errors.title ? (
+              <p className="mt-1.5 text-[10px] font-normal text-red-600 uppercase tracking-wide">{errors.title}</p>
+            ) : (
+              <p className="mt-1.5 text-[9px] font-normal text-slate-400 uppercase tracking-wide leading-snug">
+                Escribe el asunto de forma clara y específica: es lo que determina el tipo de soporte que se asignará a tu caso.
+              </p>
+            )}
+          </div>
 
           <FormField label="Área dirigida:" required error={errors.category}>
             <FormSelect

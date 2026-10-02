@@ -2,6 +2,7 @@
 // TicketDetailModal.tsx — Modal de detalle rápido de ticket
 // Funcionalidades:
 //   - Vista compacta del ticket (información + chat en pestañas)
+//   - Muestra el nivel de complejidad técnica (N1/N2/N3) en tickets de Sistemas
 //   - Chat en tiempo real con envío de mensajes e imágenes
 //   - Gestión de estado del ticket (Pendiente → En Proceso → Resuelto → Cerrado)
 //   - Eliminación de ticket con limpieza de adjuntos
@@ -14,6 +15,8 @@ import { supabase } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
+import ComplexityBadge from './ComplexityBadge';
+import { COMPLEXITY_CATEGORY } from '../tickets.types';
 
 // Props del componente modal
 // ticket: Datos del ticket a mostrar
@@ -400,8 +403,13 @@ export default function TicketDetailModal({ ticket: initialTicket, onClose, onUp
                     } md:flex w-full md:w-[420px] bg-[#F8FAFC] border-r border-slate-100 p-4 sm:p-6 md:p-10 flex-col overflow-y-auto custom-scrollbar`}>
                         <div className="flex items-center justify-between mb-6 sm:mb-8 md:mb-10">
                             <span className="text-[8px] sm:text-[9px] md:text-[10px] font-normal text-slate-300 uppercase tracking-[0.2em] sm:tracking-[0.25em] md:tracking-[0.3em]">#TK-{currentTicket.id.slice(0, 8)}</span>
-                            <div className={`px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[7px] sm:text-[8px] md:text-[9px] font-normal uppercase tracking-[0.15em] sm:tracking-[0.2em] border ${getPriorityStyle(currentTicket.priority)}`}>
-                                {getPriorityLabel(currentTicket.priority)}
+                            <div className="flex items-center gap-2">
+                                <div className={`px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[7px] sm:text-[8px] md:text-[9px] font-normal uppercase tracking-[0.15em] sm:tracking-[0.2em] border ${getPriorityStyle(currentTicket.priority)}`}>
+                                    {getPriorityLabel(currentTicket.priority)}
+                                </div>
+                                {currentTicket.category === COMPLEXITY_CATEGORY && (
+                                    <ComplexityBadge level={currentTicket.complexity_level} variant="full" />
+                                )}
                             </div>
                         </div>
 

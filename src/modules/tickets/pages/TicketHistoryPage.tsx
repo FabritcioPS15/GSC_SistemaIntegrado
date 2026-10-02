@@ -2,7 +2,7 @@
 // TicketHistoryPage.tsx — Historial de tickets archivados
 // Funcionalidades:
 //   - Lista todos los tickets con estado "archived"
-//   - Filtros por búsqueda, prioridad y rango de fechas
+//   - Filtros por búsqueda, prioridad, nivel de complejidad y rango de fechas
 //   - Exportación a PDF y Excel
 //   - Cálculo de tiempo de resolución (desde creación hasta cierre)
 // =============================================================================
@@ -14,6 +14,8 @@ import { FaFilePdf } from "react-icons/fa6";
 import { RiFileExcel2Fill } from "react-icons/ri";
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import { supabase } from '../../../shared/services/supabase';
+import ComplexityBadge from '../components/ComplexityBadge';
+import { COMPLEXITY_CATEGORY, COMPLEXITY_LABELS, COMPLEXITY_LEVELS, normalizeComplexity } from '../tickets.types';
 import {
     Table,
     TableHeader,
@@ -31,6 +33,8 @@ interface Ticket {
     description?: string;
     status: string;
     priority: string;
+    category?: string;
+    complexity_level?: string;
     created_at: string;
     updated_at: string;
     closed_at?: string;
@@ -56,6 +60,12 @@ const PRIORITY_STYLES: Record<string, { label: string, color: string, dot: strin
     low: { label: 'P4 - Baja', color: 'bg-slate-100 text-slate-600', dot: 'bg-slate-500' }
 };
 
+// Texto de complejidad para los reportes: los tickets de otras áreas no se clasifican
+const complexityReportLabel = (ticket: Ticket) =>
+    normalizeComplexity(ticket.complexity_level)
+        ? COMPLEXITY_LABELS[normalizeComplexity(ticket.complexity_level) as keyof typeof COMPLEXITY_LABELS]
+        : (ticket.category === COMPLEXITY_CATEGORY ? 'Sin clasificar' : 'N/A');
+
 export default function TicketHistory() {
     const navigate = useNavigate();
     // Estado local para filtros y carga de datos
@@ -64,6 +74,7 @@ export default function TicketHistory() {
     const [refreshing, setRefreshing] = useState(false); // Indicador de refresco manual
     const [searchTerm, setSearchTerm] = useState(''); // Término de búsqueda en título/solicitante/ubicación
     const [filterPriority, setFilterPriority] = useState<string[]>([]); // Filtro por prioridad (array de valores)
+    const [filterComplexity, setFilterComplexity] = useState<string[]>([]); // Filtro por nivel de complejidad (N1/N2/N3)
     const [filterDateRange, setFilterDateRange] = useState<string[]>([]); // Rango de fechas predefinido (all, 7days, 30days, 90days, custom)
     const [startDate, setStartDate] = useState(''); // Fecha inicio del rango custom (YYYY-MM-DD)
     const [endDate, setEndDate] = useState(''); // Fecha fin del rango custom (YYYY-MM-DD)
@@ -104,6 +115,7 @@ export default function TicketHistory() {
     // Filtra los tickets archivados según múltiples criterios:
     // - Búsqueda: título, solicitante o ubicación (case-insensitive)
     // - Prioridad: filtra por array de prioridades seleccionadas
+    // - Complejidad: filtra por array de niveles N1/N2/N3 seleccionados
     // - Rango de fechas: predefinido (7/30/90 días) o custom (start/end)
     // Usa closed_at para filtrar por fecha, o created_at si no hay closed_at
     const filteredTickets = useMemo(() => {
@@ -115,6 +127,8 @@ export default function TicketHistory() {
                 ticket.locations?.name?.toLowerCase().includes(searchTerm.toLowerCase());
             // Priority filter
             const priorityMatch = filterPriority.length === 0 || filterPriority.includes(ticket.priority);
+            // Complexity filter (solo aplica al área de Sistemas)
+            const complexityMatch = filterComplexity.length === 0 || filterComplexity.includes(ticket.complexity_level || '');
 
             // Date range filter
             let dateMatch = true;
@@ -151,9 +165,9 @@ export default function TicketHistory() {
                 }
             }
 
-            return searchMatch && priorityMatch && dateMatch;
+            return searchMatch && priorityMatch && complexityMatch && dateMatch;
         });
-    }, [tickets, searchTerm, filterPriority, filterDateRange, startDate, endDate]);
+    }, [tickets, searchTerm, filterPriority, filterComplexity, filterDateRange, startDate, endDate]);
 
     // Calcula el tiempo transcurrido desde la creación hasta el cierre del ticket
     // Devuelve formato legible: segundos, minutos u horas según la duración
@@ -198,6 +212,7 @@ export default function TicketHistory() {
             attendant: t.attendant?.full_name || 'Sin asignar',
             ubicacion: t.locations?.name || 'N/A',
             priority: PRIORITY_STYLES[t.priority]?.label || t.priority,
+            complexity: complexityReportLabel(t),
             created_at: new Date(String(t.created_at).includes('T') ? String(t.created_at) : `${t.created_at}T12:00:00`).toLocaleDateString(),
             closed_at: t.closed_at ? new Date(String(t.closed_at).includes('T') ? String(t.closed_at) : `${t.closed_at}T12:00:00`).toLocaleDateString() : 'N/A',
             time_to_close: getTimeToClose(t)
@@ -214,6 +229,7 @@ export default function TicketHistory() {
                 { header: 'Atendido Por', key: 'attendant' },
                 { header: 'Ubicación', key: 'ubicacion' },
                 { header: 'Prioridad', key: 'priority' },
+                { header: 'Complejidad', key: 'complexity' },
                 { header: 'Fecha Creación', key: 'created_at' },
                 { header: 'Fecha Cierre', key: 'closed_at' },
                 { header: 'Tiempo de Cierre', key: 'time_to_close' },
@@ -235,6 +251,7 @@ export default function TicketHistory() {
             attendant: t.attendant?.full_name || 'Sin asignar',
             ubicacion: t.locations?.name || 'N/A',
             priority: PRIORITY_STYLES[t.priority]?.label || t.priority,
+            complexity: complexityReportLabel(t),
             status: 'Archivado',
             created_at: new Date(t.created_at).toLocaleString(),
             closed_at: t.closed_at ? new Date(t.closed_at).toLocaleString() : 'N/A',
@@ -253,6 +270,7 @@ export default function TicketHistory() {
                 { header: 'Atendido Por', key: 'attendant', width: 25 },
                 { header: 'Ubicación', key: 'ubicacion', width: 20 },
                 { header: 'Prioridad', key: 'priority', width: 15 },
+                { header: 'Complejidad', key: 'complexity', width: 24 },
                 { header: 'Estado', key: 'status', width: 15 },
                 { header: 'Fecha Creación', key: 'created_at', width: 22 },
                 { header: 'Fecha Cierre', key: 'closed_at', width: 22 },
@@ -313,6 +331,12 @@ export default function TicketHistory() {
                                         ]
                                     },
                                     {
+                                        key: 'complexity', placeholder: 'Toda complejidad', options: COMPLEXITY_LEVELS.map(level => ({
+                                            value: level,
+                                            label: COMPLEXITY_LABELS[level],
+                                        }))
+                                    },
+                                    {
                                         key: 'dateRange', placeholder: 'Todo el tiempo', options: [
                                             { value: '7days', label: 'Últimos 7 días' },
                                             { value: '30days', label: 'Últimos 30 días' },
@@ -321,9 +345,10 @@ export default function TicketHistory() {
                                         ]
                                     },
                                 ]}
-                                values={{ priority: filterPriority, dateRange: filterDateRange }}
+                                values={{ priority: filterPriority, complexity: filterComplexity, dateRange: filterDateRange }}
                                 onChange={(key, value) => {
                                     if (key === 'priority') setFilterPriority(value as string[]);
+                                    else if (key === 'complexity') setFilterComplexity(value as string[]);
                                     else if (key === 'dateRange') setFilterDateRange(value as string[]);
                                 }}
                                 hideClearButton
@@ -389,7 +414,7 @@ export default function TicketHistory() {
                             </div>
                             <h3 className="text-xl font-semibold text-[#002855] uppercase tracking-widest mb-2">No se encontraron tickets</h3>
                             <p className="text-slate-400 text-[10px] font-semibold uppercase tracking-widest">
-                                {searchTerm || filterPriority.length > 0 || filterDateRange.length > 0
+                                {searchTerm || filterPriority.length > 0 || filterComplexity.length > 0 || filterDateRange.length > 0
                                     ? 'Intenta ajustar los filtros de búsqueda'
                                     : 'Los tickets cerrados aparecerán aquí después de 10 minutos'
                                 }
@@ -405,9 +430,14 @@ export default function TicketHistory() {
                                         <div key={ticket.id} onClick={() => navigate(`/ticket/${ticket.id}`)} className="bg-white border border-slate-200 p-4 active:bg-slate-50 transition-all cursor-pointer">
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="text-[10px] font-semibold text-[#002855] uppercase">#TK-{ticket.id.slice(0, 6)}</span>
-                                                <span className={`text-[9px] font-semibold tracking-wider ${prio.color}`}>
-                                                    {prio.label}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[9px] font-semibold tracking-wider ${prio.color}`}>
+                                                        {prio.label}
+                                                    </span>
+                                                    {ticket.category === COMPLEXITY_CATEGORY && (
+                                                        <ComplexityBadge level={ticket.complexity_level} />
+                                                    )}
+                                                </div>
                                             </div>
                                             <p className="text-[12px] font-semibold text-slate-700 uppercase leading-tight mb-2 line-clamp-2">{ticket.title}</p>
                                             <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-2">
@@ -445,6 +475,7 @@ export default function TicketHistory() {
                                             <TableHead>Solicitante</TableHead>
                                             <TableHead>Atendido por</TableHead>
                                             <TableHead>Prioridad</TableHead>
+                                            <TableHead>Complejidad</TableHead>
                                             <TableHead>Tiempos</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -486,9 +517,14 @@ export default function TicketHistory() {
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className={`text-[9px] font-semibold uppercase tracking-widest ${prio.color}`}>
-                                                            {prio.label}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-[9px] font-semibold uppercase tracking-widest ${prio.color}`}>
+                                                                {prio.label}
+                                                            </span>
+                                                            {ticket.category === COMPLEXITY_CATEGORY && (
+                                                                <ComplexityBadge level={ticket.complexity_level} />
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col gap-1 text-[10px] font-semibold text-slate-600">

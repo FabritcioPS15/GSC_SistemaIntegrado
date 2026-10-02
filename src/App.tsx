@@ -94,6 +94,8 @@ import Quotations from './modules/quotations/pages/QuotationsPage';
 
 import ChecklistDetail from './modules/checklist/pages/ChecklistDetailPage';
 
+import ChecklistObservaciones from './modules/checklist/pages/ChecklistObservacionesPage';
+
 import Vacations from './modules/users/pages/VacationsPage';
 
 import CVsPage from './modules/rrhh/pages/CVsPage';
@@ -419,7 +421,10 @@ function AppContent() {
             <Route path="/sent/:location" element={<ProtectedRoute><EnviadosWrapper /></ProtectedRoute>} />
 
             {/* Checklist */}
+            {/* La ruta estática gana sobre `/checklist/:type` en el ranking de react-router */}
             <Route path="/checklist" element={<ProtectedRoute permission="checklist"><Checklist /></ProtectedRoute>} />
+            <Route path="/checklist/comentarios" element={<ProtectedRoute permission="checklist"><ChecklistObservaciones /></ProtectedRoute>} />
+            <Route path="/checklist/observaciones" element={<Navigate to="/checklist/comentarios" replace />} />
             <Route path="/checklist/:type" element={<ProtectedRoute><ChecklistWrapper /></ProtectedRoute>} />
             <Route path="/checklist/:type/:id" element={<ProtectedRoute><ChecklistDetail /></ProtectedRoute>} />
 

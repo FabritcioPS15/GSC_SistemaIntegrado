@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Car, ChevronRight, Stethoscope, GraduationCap, FileText, ExternalLink, Edit, MapPin, Search, X, ListChecks, FolderOpen, Plus } from 'lucide-react';
+import { Car, ChevronRight, Stethoscope, GraduationCap, FileText, ExternalLink, Edit, MapPin, Search, X, ListChecks, FolderOpen, Plus, MessageSquareWarning } from 'lucide-react';
 import { supabase, Location } from '../../../shared/services/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthContext';
@@ -280,7 +280,15 @@ export default function Checklist({ type }: { type?: string }) {
                   </button>
                )}
 
-               <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
+                <button
+                   onClick={() => navigate('/checklist/comentarios')}
+                   className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 text-[#002855] text-[10px] font-normal uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                >
+                   <MessageSquareWarning size={14} />
+                   Comentarios
+                </button>
+
+                <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
 
                {canEdit() && (
                   <SelectionModeButton

@@ -2,11 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Package, Building2, MapPin, Wrench, TrendingUp, AlertTriangle,
   CheckCircle, DollarSign, BarChart3, PieChart, Filter, RefreshCw,
-  Activity, Percent
+  Activity, Percent, Layers
 } from 'lucide-react';
-import { supabase } from '../../../shared/services/supabase';
+import { supabase, AssetWithDetails } from '../../../shared/services/supabase';
 import {
-  AssetWithDetails,
   MaintenanceRecord,
   Company,
   Location,
@@ -14,6 +13,7 @@ import {
   BUSINESS_TYPE_LABELS,
 } from '../../../shared/types/inventory.types';
 import AssetDetails from './AssetDetails';
+import FilterBar from '../../../shared/components/ui/FilterBar';
 
 // Estado de uso constants
 const ESTADO_USO_LABELS: Record<string, string> = {
@@ -354,93 +354,75 @@ export default function InventoryDashboard({ companyId, locationId }: InventoryD
         </button>
       </div>
 
-      {/* Filtros internos */}
+      {/* Filtros internos con estilo institucional FilterBar */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={14} className="text-[#002855]" />
-          <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Filtrar por</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <FilterBar
+            filters={[
+              {
+                key: 'company',
+                placeholder: 'TODAS LAS EMPRESAS',
+                icon: Building2,
+                iconClassName: 'text-[#002855]',
+                wrapperClassName: 'flex-1 min-w-[200px]',
+                multiple: false,
+                options: rawData.companies.map(c => ({ value: c.id, label: c.name }))
+              },
+              {
+                key: 'location',
+                placeholder: 'TODAS LAS SEDES',
+                icon: MapPin,
+                iconClassName: 'text-rose-500',
+                wrapperClassName: 'flex-1 min-w-[200px]',
+                multiple: false,
+                options: availableLocations.map(l => ({ value: l.id, label: l.name }))
+              },
+              {
+                key: 'business_type',
+                placeholder: 'TODOS LOS RUBROS',
+                icon: Filter,
+                iconClassName: 'text-blue-500',
+                wrapperClassName: 'flex-1 min-w-[200px]',
+                multiple: false,
+                options: Object.entries(BUSINESS_TYPE_LABELS).map(([value, label]) => ({ value, label }))
+              },
+              {
+                key: 'category',
+                placeholder: 'TODAS LAS CATEGORÍAS',
+                icon: Layers,
+                iconClassName: 'text-amber-500',
+                wrapperClassName: 'flex-1 min-w-[200px]',
+                multiple: false,
+                options: rawData.categories.map(c => ({ value: c.id, label: c.name }))
+              },
+            ]}
+            values={{
+              company: filterCompany,
+              location: filterLocation,
+              business_type: filterBusinessType,
+              category: filterCategory,
+            }}
+            onChange={(key, value) => {
+              const val = Array.isArray(value) ? (value[0] || '') : (value || '');
+              if (key === 'company') {
+                setFilterCompany(val);
+                setFilterLocation('');
+              } else if (key === 'location') {
+                setFilterLocation(val);
+              } else if (key === 'business_type') {
+                setFilterBusinessType(val);
+              } else if (key === 'category') {
+                setFilterCategory(val);
+              }
+            }}
+            onClearAll={() => {
+              setFilterCompany('');
+              setFilterLocation('');
+              setFilterBusinessType('');
+              setFilterCategory('');
+            }}
+          />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Empresa</label>
-            <select
-              value={filterCompany}
-              onChange={e => { setFilterCompany(e.target.value); setFilterLocation(''); }}
-              className="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#002855]/20 focus:border-[#002855] transition-all"
-            >
-              <option value="">Todas las empresas</option>
-              {rawData.companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Sede</label>
-            <select
-              value={filterLocation}
-              onChange={e => setFilterLocation(e.target.value)}
-              className="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#002855]/20 focus:border-[#002855] transition-all"
-            >
-              <option value="">Todas las sedes</option>
-              {availableLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Rubro</label>
-            <select
-              value={filterBusinessType}
-              onChange={e => setFilterBusinessType(e.target.value)}
-              className="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#002855]/20 focus:border-[#002855] transition-all"
-            >
-              <option value="">Todos los rubros</option>
-              {Object.entries(BUSINESS_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Categoria</label>
-            <select
-              value={filterCategory}
-              onChange={e => setFilterCategory(e.target.value)}
-              className="w-full text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#002855]/20 focus:border-[#002855] transition-all"
-            >
-              <option value="">Todas las categorias</option>
-              {rawData.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {(filterCompany || filterLocation || filterBusinessType || filterCategory) && (
-          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
-            {filterCompany && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#002855]/10 text-[#002855] rounded-lg text-[10px] font-bold">
-                Empresa: {rawData.companies.find(c => c.id === filterCompany)?.name}
-                <button onClick={() => setFilterCompany('')} className="hover:text-[#002855] ml-1">x</button>
-              </span>
-            )}
-            {filterLocation && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg text-[10px] font-bold">
-                Sede: {rawData.locations.find(l => l.id === filterLocation)?.name}
-                <button onClick={() => setFilterLocation('')} className="hover:text-purple-900 ml-1">x</button>
-              </span>
-            )}
-            {filterBusinessType && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-700 rounded-lg text-[10px] font-bold">
-                Rubro: {(BUSINESS_TYPE_LABELS as any)[filterBusinessType]}
-                <button onClick={() => setFilterBusinessType('')} className="hover:text-teal-900 ml-1">x</button>
-              </span>
-            )}
-            {filterCategory && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-bold">
-                Categoria: {rawData.categories.find(c => c.id === filterCategory)?.name}
-                <button onClick={() => setFilterCategory('')} className="hover:text-amber-900 ml-1">x</button>
-              </span>
-            )}
-            <button
-              onClick={() => { setFilterCompany(''); setFilterLocation(''); setFilterBusinessType(''); setFilterCategory(''); }}
-              className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold hover:bg-slate-200 transition-colors"
-            >
-              Limpiar filtros
-            </button>
-          </div>
-        )}
       </div>
 
       {/* KPI Cards fila 1 */}

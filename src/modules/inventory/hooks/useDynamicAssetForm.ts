@@ -102,7 +102,7 @@ function buildInitialFields(editAsset?: AssetWithDetails, initialCategoryId?: st
   if (!editAsset) {
     if (initialCategoryId) fields.category_id = initialCategoryId;
     // Si el usuario está restringido a una sola sede, predefinirla automáticamente
-    if (allowedLocations !== null && allowedLocations.length === 1 && !fields.location_id) {
+    if (allowedLocations && allowedLocations.length === 1 && !fields.location_id) {
       fields.location_id = allowedLocations[0];
     }
     if (!fields.codigo_unico) {

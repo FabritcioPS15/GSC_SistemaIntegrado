@@ -132,6 +132,56 @@ export type Location = {
 
 };
 
+/**
+ * Observación de checklist ingestada desde Google Sheets.
+ *
+ * La escribe la Edge Function `checklist-ingest` (service role) cuando el
+ * Apps Script "Sistema Centralizado Multisede - ESCON" exporta el checklist.
+ * Solo se generan filas para las secciones que TIENEN comentario escrito:
+ * las secciones en blanco no llegan a existir en la tabla.
+ *
+ * `sede` es texto plano y no FK a locations.id a propósito: los nombres de
+ * sede del Excel ("ESCON MBS ATE") no tienen por qué coincidir 1:1 con los
+ * registros de locations, y un FK las rechazaría.
+ */
+export type ChecklistObservacion = {
+
+  id: string;
+
+  sede: string;
+
+  /**
+   * Sede real en `locations`, resuelta por la Edge Function a partir del
+   * nombre de la hoja. NULL cuando no hubo coincidencia: la fila se sigue
+   * guardando (para que gerencia vea el dato) pero solo gerencia la ve.
+   * El filtro por permisos de la app usa ESTE campo, no `sede`.
+   */
+  location_id: string | null;
+
+  /** ISO date: 'YYYY-MM-DD' */
+  fecha: string;
+
+  /** 'PERSONAL' | 'EQUIPOS' — bloque del checklist del que salió la fila */
+  bloque: string;
+
+  seccion: string;
+
+  comentario: string;
+
+   origen: string;
+
+   /**
+    * Soft-delete. La columna sigue existiendo pero la interfaz ya no la usa:
+    * el listado muestra todo junto y el borrado es definitivo.
+    */
+   archivado: boolean;
+
+   created_at: string;
+
+   updated_at: string;
+
+};
+
 
 
 export type Category = {

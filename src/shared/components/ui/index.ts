@@ -8,6 +8,8 @@
 
 export { default as ActionToolbar } from './ActionToolbar';
 export { default as Breadcrumbs } from './Breadcrumbs';
+export { default as DateRangeFilter } from './DateRangeFilter';
+export type { DateRange } from './DateRangeFilter';
 export { default as DetailModal } from './DetailModal';
 export { default as EmptyState } from './EmptyState';
 export { default as ExportButtons } from './ExportButtons';

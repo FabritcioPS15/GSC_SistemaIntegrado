@@ -12,16 +12,17 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import TicketForm from '../forms/TicketForm';
 import SLATimer from '../components/SLATimer';
+import ComplexityBadge from '../components/ComplexityBadge';
 import { useTicketNotifications } from '../hooks/useTicketNotifications';
-import { Ticket, TicketStatus, TicketPriority } from '../tickets.types';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
+import { Ticket, TicketStatus, TicketPriority, COMPLEXITY_CATEGORY, COMPLEXITY_LABELS, COMPLEXITY_LEVELS, TicketComplexity, normalizeComplexity } from '../tickets.types';import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
 
 // =============================================================================
 // TicketsPage.tsx — Página principal del módulo Mesa de Ayuda
 // Funcionalidades:
 //   - Dashboard Kanban con columnas: Pendiente, En Proceso, Finalizados, Cerrados
 //   - Vista "Mis Tickets" con tickets creados y atendidos por el usuario
-//   - Reportes con métricas, filtros por fecha y exportación PDF/Excel
+//   - Reportes con métricas, distribución por nivel de complejidad (N1/N2/N3),
+//     filtros por fecha y exportación PDF/Excel
 //   - Automatización de estados: Resuelto→Cerrado (3min), Cerrado→Archivado (10min)
 //   - Suscripción en tiempo real a cambios via Supabase Realtime
 //   - Comunicación con el header global via CustomEvents (search, new, export)
@@ -45,6 +46,68 @@ const STATUS_STYLES: Record<string, string> = {
     archived: 'bg-slate-100 text-slate-600'
 };
 
+// Muestra el nivel de complejidad del ticket (N1/N2/N3)
+// Solo se renderiza para el área de Sistemas, donde la clasificación aplica
+function TicketComplexityBadge({ ticket }: { ticket: any }) {
+    if (ticket.category !== COMPLEXITY_CATEGORY) return null;
+    return <ComplexityBadge level={ticket.complexity_level} />;
+}
+
+// Valor interno del filtro de complejidad para los tickets aún sin clasificar
+const REPORT_UNCLASSIFIED = '__none__';
+
+// Opciones del filtro de complejidad del reporte
+const REPORT_COMPLEXITY_FILTERS = [
+    { value: '', label: 'Todos' },
+    ...COMPLEXITY_LEVELS.map(level => ({ value: level, label: level })),
+    { value: REPORT_UNCLASSIFIED, label: 'Sin clasificar' },
+];
+
+// Convierte created_at en Date sin desfase de un día
+// Los tickets guardados como fecha simple ("2026-05-04") se interpretan en UTC
+// y pueden aparecer con el día anterior al formatearlos
+function parseTicketDate(value: string): Date {
+    return new Date(String(value).includes('T') ? String(value) : `${value}T12:00:00`);
+}
+
+// Indica si el ticket cae dentro del rango de fechas del reporte
+function isWithinPeriod(ticket: any, startDate: string, endDate: string): boolean {
+    if (startDate && parseTicketDate(ticket.created_at) < new Date(startDate)) return false;
+
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (parseTicketDate(ticket.created_at) > end) return false;
+    }
+
+    return true;
+}
+
+// Aplica el filtro de complejidad del reporte.
+// Solo el área de Sistemas tiene nivel, así que al elegir un nivel las demás
+// áreas quedan fuera; con el filtro en "Todos" no se descarta ninguna.
+function matchesComplexityFilter(ticket: any, filter: string): boolean {
+    if (!filter) return true;
+    if (ticket.category !== COMPLEXITY_CATEGORY) return false;
+
+    const level = normalizeComplexity(ticket.complexity_level);
+    return filter === REPORT_UNCLASSIFIED ? !level : level === filter;
+}
+
+// Etiqueta legible del filtro de complejidad activo, para los encabezados del reporte
+function complexityFilterLabel(filter: string): string {
+    if (!filter) return 'Todos los niveles';
+    if (filter === REPORT_UNCLASSIFIED) return 'Sin clasificar';
+    return COMPLEXITY_LABELS[filter as TicketComplexity] || filter;
+}
+
+// Texto de la columna Complejidad en las descargas
+// Sistemas sin nivel → "Sin clasificar"; otras áreas → "N/A"
+function complexityReportLabel(ticket: any): string {
+    if (ticket.category !== COMPLEXITY_CATEGORY) return 'N/A';
+    return ticket.complexity_level || 'Sin clasificar';
+}
+
 export default function Tickets() {
     const { user } = useAuth();
     const { view } = useParams(); // Vista activa desde la URL: dashboard, mine, reports
@@ -57,6 +120,8 @@ export default function Tickets() {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState(''); // Filtro de fecha inicio
     const [endDate, setEndDate] = useState(''); // Filtro de fecha fin
+    // Filtro del reporte por nivel de complejidad: '' = todos, 'N1'|'N2'|'N3'|'__none__' (sin clasificar)
+    const [reportComplexity, setReportComplexity] = useState('');
 
     // Suscripción a notificaciones en tiempo real
     useTicketNotifications();
@@ -187,21 +252,9 @@ export default function Tickets() {
             const { data, error } = await supabase
                 .from('tickets')
                 .select(`
-                    id, 
-                    title, 
-                    description, 
-                    status, 
-                    priority, 
-                    created_at, 
-                    updated_at, 
-                    attended_at, 
-                    resolved_at, 
-                    closed_at,
-                    requester_id,
-                    assigned_to,
-                    location_id,
-                    requester:requester_id(full_name, avatar_url), 
-                    attendant:assigned_to(full_name, avatar_url), 
+                    *,
+                    requester:requester_id(full_name, avatar_url),
+                    attendant:assigned_to(full_name, avatar_url),
                     locations(name)
                 `)
                 .order('created_at', { ascending: false });
@@ -389,6 +442,8 @@ export default function Tickets() {
     // - Tasa de resolución: porcentaje de tickets resueltos/cerrados/archivados
     // - Tiempo promedio de respuesta: tiempo entre creación y primera atención
     // - Tickets activos: tickets en estado 'open' o 'in_progress'
+    // - Distribución por nivel de complejidad: solo aplica al área de Sistemas y
+    //   separa los tickets aún sin clasificar para que el técnico los defina
     const metricsData = useMemo(() => {
         let filteredForMetrics = [...tickets];
         if (startDate) {
@@ -402,7 +457,23 @@ export default function Tickets() {
         }
 
         const total = filteredForMetrics.length;
-        if (total === 0) return { resolutionRate: '0%', avgResponseTime: '0m', activeTickets: 0, total: 0, resolved: 0 };
+        const complexityDistribution = COMPLEXITY_LEVELS.reduce((acc, level) => {
+            acc[level] = 0;
+            return acc;
+        }, {} as Record<TicketComplexity, number>);
+        let unclassifiedComplexity = 0;
+
+        const sistemasTickets = filteredForMetrics.filter(t => t.category === COMPLEXITY_CATEGORY);
+        for (const t of sistemasTickets) {
+            const level = normalizeComplexity(t.complexity_level);
+            if (level) {
+                complexityDistribution[level] += 1;
+            } else {
+                unclassifiedComplexity += 1;
+            }
+        }
+
+        if (total === 0) return { resolutionRate: '0%', avgResponseTime: '0m', activeTickets: 0, total: 0, resolved: 0, complexityDistribution, unclassifiedComplexity };
 
         const resolved = filteredForMetrics.filter(t => t.status === 'resolved' || t.status === 'closed' || t.status === 'archived').length;
         const resolutionRate = ((resolved / total) * 100).toFixed(1) + '%';
@@ -420,26 +491,53 @@ export default function Tickets() {
             avgResponseTime = `${minutes}m ${seconds}s`;
         }
 
-        return { resolutionRate, avgResponseTime, activeTickets, total, resolved };
+        return { resolutionRate, avgResponseTime, activeTickets, total, resolved, complexityDistribution, unclassifiedComplexity };
     }, [tickets, startDate, endDate]);
 
+    // Alcance del reporte: tickets del rango de fechas, acotados por el filtro de
+    // complejidad. Lo usan la tabla de detalle y las descargas (PDF/Excel) para
+    // que pantalla y archivo siempre muestren exactamente lo mismo.
+    const reportFilteredTickets = useMemo(() => {
+        return tickets.filter(t => isWithinPeriod(t, startDate, endDate) && matchesComplexityFilter(t, reportComplexity));
+    }, [tickets, startDate, endDate, reportComplexity]);
+
+    // Filas del reporte por nivel: solo el área de Sistemas del alcance anterior
+    const reportComplexityRows = useMemo(() => {
+        return reportFilteredTickets
+            .filter((t: any) => t.category === COMPLEXITY_CATEGORY)
+            .sort((a: any, b: any) => parseTicketDate(b.created_at).getTime() - parseTicketDate(a.created_at).getTime());
+    }, [reportFilteredTickets]);
+
+    // Conteo por nivel sobre el alcance del reporte, para las descargas
+    const reportDistribution = useMemo(() => {
+        const distribution = COMPLEXITY_LEVELS.reduce((acc, level) => {
+            acc[level] = 0;
+            return acc;
+        }, {} as Record<TicketComplexity, number>);
+        let unclassified = 0;
+
+        for (const t of reportFilteredTickets) {
+            if (t.category !== COMPLEXITY_CATEGORY) continue;
+            const level = normalizeComplexity(t.complexity_level);
+            if (level) {
+                distribution[level] += 1;
+            } else {
+                unclassified += 1;
+            }
+        }
+
+        return { distribution, unclassified, total: reportFilteredTickets.length };
+    }, [reportFilteredTickets]);
+
     // Genera un reporte PDF con métricas y lista de tickets
-    // Incluye tabla con los primeros 100 tickets del periodo
+    // Respeta el rango de fechas y el filtro de complejidad activos
+    // Incluye tabla con los primeros 100 tickets del alcance
     // Usa jsPDF y autoTable para generar el documento
     const generatePDF = () => {
         const doc = new jsPDF();
 
-        // Filter tickets for report
-        let reportTickets = [...tickets];
-        if (startDate) {
-            const start = new Date(startDate);
-            reportTickets = reportTickets.filter(t => new Date(t.created_at) >= start);
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            reportTickets = reportTickets.filter(t => new Date(t.created_at) <= end);
-        }
+        // Alcance del reporte: mismas filas que muestra la tabla en pantalla
+        const reportTickets = reportFilteredTickets;
 
         // Title & Header
         doc.setFontSize(20);
@@ -452,18 +550,32 @@ export default function Tickets() {
         if (startDate || endDate) {
             doc.text(`Rango: ${startDate || 'Inicio'} hasta ${endDate || 'Hoy'}`, 14, 37);
         }
+        doc.text(`Nivel de Complejidad: ${complexityFilterLabel(reportComplexity)}`, 14, 44);
 
         // Metrics Section
         doc.setFontSize(14);
         doc.setTextColor(0, 40, 85);
-        doc.text('Métricas del Periodo', 14, 48);
+        doc.text('Métricas del Periodo', 14, 57);
 
         doc.setFontSize(11);
         doc.setTextColor(60);
-        doc.text(`Total de Tickets: ${metricsData.total}`, 14, 58);
-        doc.text(`Tickets Resueltos: ${metricsData.resolved} (${metricsData.resolutionRate})`, 14, 65);
-        doc.text(`Tickets Activos: ${metricsData.activeTickets}`, 14, 72);
-        doc.text(`Tiempo Promedio de Respuesta: ${metricsData.avgResponseTime}`, 14, 79);
+        doc.text(`Total de Tickets: ${metricsData.total}`, 14, 67);
+        doc.text(`Tickets Resueltos: ${metricsData.resolved} (${metricsData.resolutionRate})`, 14, 74);
+        doc.text(`Tickets Activos: ${metricsData.activeTickets}`, 14, 81);
+        doc.text(`Tiempo Promedio de Respuesta: ${metricsData.avgResponseTime}`, 14, 88);
+
+        // Distribución por nivel de complejidad técnica (solo área de Sistemas)
+        // Se cuenta sobre las filas exportadas para que cuadre con la tabla
+        doc.setFontSize(12);
+        doc.setTextColor(0, 40, 85);
+        doc.text('Distribución por Nivel de Complejidad', 14, 102);
+        doc.setFontSize(10);
+        doc.setTextColor(80);
+        COMPLEXITY_LEVELS.forEach((level, idx) => {
+            doc.text(`${COMPLEXITY_LABELS[level]}: ${reportDistribution.distribution[level]}`, 14, 111 + idx * 6);
+        });
+        const distributionEndY = 111 + COMPLEXITY_LEVELS.length * 6;
+        doc.text(`Sin clasificar: ${reportDistribution.unclassified}`, 14, distributionEndY);
 
         // Tickets Table
         const tableBody = reportTickets.slice(0, 100).map(t => [
@@ -471,54 +583,95 @@ export default function Tickets() {
             t.title,
             t.status === 'open' ? 'Pendiente' : t.status === 'in_progress' ? 'En Proceso' : t.status === 'resolved' ? 'Resuelto' : t.status === 'closed' ? 'Cerrado' : 'Archivado',
             t.priority === 'critical' ? 'P1 - Crítica' : t.priority === 'high' ? 'P2 - Alta' : t.priority === 'medium' ? 'P3 - Media' : 'P4 - Baja',
-            new Date(String(t.created_at).includes('T') ? String(t.created_at) : `${t.created_at}T12:00:00`).toLocaleDateString()
+            complexityReportLabel(t),
+            parseTicketDate(t.created_at).toLocaleDateString()
         ]);
 
+        const tableStartY = distributionEndY + 10;
         autoTable(doc, {
-            startY: 90,
-            head: [['ID', 'Incidente', 'Estado', 'Prioridad', 'Fecha']],
+            startY: tableStartY,
+            head: [['ID', 'Incidente', 'Estado', 'Prioridad', 'Complejidad', 'Fecha']],
             body: tableBody,
             headStyles: { fillColor: [0, 40, 85] },
             alternateRowStyles: { fillColor: [240, 245, 250] },
-            margin: { top: 90 }
+            margin: { top: tableStartY }
         });
+
+        // Si la tabla se truncó, dejar constancia en el documento
+        if (reportTickets.length > 100) {
+            const finalY = (doc as any).lastAutoTable?.finalY ?? tableStartY;
+            doc.setFontSize(9);
+            doc.setTextColor(120);
+            doc.text(
+                `Se muestran los primeros 100 tickets de ${reportTickets.length}. Exporta a Excel para el detalle completo.`,
+                14,
+                finalY + 8
+            );
+        }
 
         doc.save(`Reporte_Tickets_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     // Genera un reporte Excel con todos los datos de los tickets
-    // Incluye más detalles que el PDF (descripción, fechas, etc.)
+    // Respeta el rango de fechas y el filtro de complejidad activos
+    // Incluye una hoja "Resumen Complejidad" con el conteo por nivel
     // Usa la librería xlsx para crear el archivo con múltiples columnas
     const generateExcel = () => {
-        // Filter tickets for report
-        let reportTickets = [...tickets];
-        if (startDate) {
-            const start = new Date(startDate);
-            reportTickets = reportTickets.filter(t => new Date(t.created_at) >= start);
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            reportTickets = reportTickets.filter(t => new Date(t.created_at) <= end);
-        }
+        const reportTickets = reportFilteredTickets;
 
         const data = reportTickets.map(t => ({
             'ID': `TK-${t.id.slice(0, 6).toUpperCase()}`,
             'Incidente': t.title,
             'Descripción': t.description || '',
+            'Área': t.category === COMPLEXITY_CATEGORY ? 'Sistemas' : (t.category || 'N/A'),
             'Estado': t.status === 'open' ? 'Pendiente' : t.status === 'in_progress' ? 'En Proceso' : t.status === 'resolved' ? 'Resuelto' : t.status === 'closed' ? 'Cerrado' : 'Archivado',
             'Prioridad': t.priority === 'critical' ? 'P1 - Crítica' : t.priority === 'high' ? 'P2 - Alta' : t.priority === 'medium' ? 'P3 - Media' : 'P4 - Baja',
+            'Complejidad': complexityReportLabel(t),
             'Solicitante': t.requester?.full_name || 'N/A',
             'Ubicación': t.locations?.name || 'N/A',
             'Atendido Por': t.attendant?.full_name || 'Sin asignar',
-            'Fecha Creación': new Date(t.created_at).toLocaleString(),
-            'Fecha Cierre': t.closed_at ? new Date(t.closed_at).toLocaleString() : 'N/A'
+            'Fecha Creación': parseTicketDate(t.created_at).toLocaleString(),
+            'Fecha Cierre': t.closed_at ? parseTicketDate(t.closed_at).toLocaleString() : 'N/A'
         }));
+
+        // Hoja de resumen: conteo por nivel sobre las mismas filas exportadas
+        const sistemasTotal = reportDistribution.distribution.N1
+            + reportDistribution.distribution.N2
+            + reportDistribution.distribution.N3
+            + reportDistribution.unclassified;
+
+        const summaryData = COMPLEXITY_LEVELS.map(level => ({
+            'Nivel': COMPLEXITY_LABELS[level],
+            'Tickets': reportDistribution.distribution[level],
+            '% del área de Sistemas': sistemasTotal === 0
+                ? '0%'
+                : `${((reportDistribution.distribution[level] / sistemasTotal) * 100).toFixed(1)}%`
+        })).concat([{
+            'Nivel': 'Sin clasificar',
+            'Tickets': reportDistribution.unclassified,
+            '% del área de Sistemas': sistemasTotal === 0
+                ? '0%'
+                : `${((reportDistribution.unclassified / sistemasTotal) * 100).toFixed(1)}%`
+        }]);
+
+        const filterData = [{
+            'Reporte': 'Mesa de Ayuda',
+            'Generado': new Date().toLocaleString(),
+            'Rango': `${startDate || 'Inicio'} hasta ${endDate || 'Hoy'}`,
+            'Filtro de complejidad': complexityFilterLabel(reportComplexity),
+            'Tickets en el reporte': reportTickets.length,
+            'Tickets del área de Sistemas': sistemasTotal
+        }];
 
         import('xlsx').then(XLSX => {
             const ws = XLSX.utils.json_to_sheet(data);
+            const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+            const wsFilter = XLSX.utils.json_to_sheet(filterData);
             const wb = XLSX.utils.book_new();
+
+            XLSX.utils.book_append_sheet(wb, wsFilter, "Filtros");
             XLSX.utils.book_append_sheet(wb, ws, "Tickets");
+            XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen Complejidad");
             XLSX.writeFile(wb, `Reporte_Tickets_${new Date().toISOString().split('T')[0]}.xlsx`);
         });
     };
@@ -551,6 +704,139 @@ export default function Tickets() {
                                     <div className="flex flex-col p-6 bg-amber-50/50 border border-amber-100 rounded-none">
                                         <div className="text-[10px] font-semibold text-amber-600/70 uppercase tracking-widest mb-2">Activos</div>
                                         <div className="text-3xl font-semibold text-amber-600">{metricsData.activeTickets}</div>
+                                    </div>
+                                </div>
+
+                                {/* Distribución por nivel de complejidad (solo área de Sistemas) */}
+                                <div className="bg-white border border-slate-100 rounded-none p-6 mb-8">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <h4 className="text-[11px] font-semibold text-blue-900 tracking-wide uppercase">Distribución por Nivel de Complejidad</h4>
+                                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Área de Sistemas</span>
+                                    </div>
+                                    <p className="text-[10px] font-normal text-slate-400 uppercase tracking-wide mb-4">
+                                        Volumen de casos por tipo de soporte requerido en el periodo
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        {COMPLEXITY_LEVELS.map((level) => (
+                                            <div key={level} className="flex flex-col p-4 bg-slate-50 border border-slate-200 rounded-none">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <ComplexityBadge level={level} variant="full" />
+                                                </div>
+                                                <div className="text-2xl font-semibold text-[#002855]">{metricsData.complexityDistribution[level]}</div>
+                                                <div className="text-[9px] font-normal text-slate-400 uppercase tracking-wide mt-1 leading-snug">
+                                                    {COMPLEXITY_LABELS[level].split(' - ')[1]}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {metricsData.unclassifiedComplexity > 0 && (
+                                        <p className="mt-4 text-[10px] font-semibold text-amber-600 uppercase tracking-widest border border-dashed border-amber-200 bg-amber-50 px-4 py-3">
+                                            {metricsData.unclassifiedComplexity} ticket(s) del área de Sistemas sin clasificar por complejidad
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Detalle por ticket con filtro por nivel de complejidad */}
+                                <div className="bg-white border border-slate-100 rounded-none p-6">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-1">
+                                        <h4 className="text-[11px] font-semibold text-blue-900 tracking-wide uppercase">
+                                            Detalle por Nivel de Complejidad
+                                        </h4>
+                                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                                            {reportComplexityRows.length} ticket(s)
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] font-normal text-slate-400 uppercase tracking-wide mb-4">
+                                        Casos del área de Sistemas en el periodo seleccionado
+                                    </p>
+
+                                    {/* Filtro por nivel */}
+                                    <div className="flex flex-wrap gap-2 mb-4">
+                                        {REPORT_COMPLEXITY_FILTERS.map((option) => (
+                                            <button
+                                                key={option.label}
+                                                type="button"
+                                                onClick={() => setReportComplexity(option.value)}
+                                                className={`px-3 py-1.5 border text-[10px] font-semibold uppercase tracking-widest transition-colors ${reportComplexity === option.value
+                                                    ? 'bg-[#002855] text-white border-[#002855]'
+                                                    : 'bg-white text-slate-500 border-slate-200 hover:border-[#002855] hover:text-[#002855]'
+                                                    }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <tr>
+                                                    <TableHead>ID</TableHead>
+                                                    <TableHead>Incidente</TableHead>
+                                                    <TableHead>Complejidad</TableHead>
+                                                    <TableHead>Prioridad</TableHead>
+                                                    <TableHead>Estado</TableHead>
+                                                    <TableHead>Atendido por</TableHead>
+                                                    <TableHead>Fecha</TableHead>
+                                                </tr>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {reportComplexityRows.length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={7}>
+                                                            <div className="py-10 flex flex-col items-center justify-center gap-2">
+                                                                <CheckCircle2 size={28} className="text-slate-300" />
+                                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                                                                    Sin tickets para este filtro
+                                                                </p>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    reportComplexityRows.map((t: any) => {
+                                                        const prio = PRIORITY_STYLES[t.priority] || PRIORITY_STYLES.medium;
+                                                        return (
+                                                            <TableRow key={t.id} onClick={() => navigate(`/ticket/${t.id}`)}>
+                                                                <TableCell>
+                                                                    <span className="text-[12px] font-semibold text-[#002855] uppercase">#TK-{t.id.slice(0, 6)}</span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[13px] font-semibold text-slate-700 uppercase leading-tight line-clamp-1">{t.title}</span>
+                                                                        <span className="text-[12px] font-semibold text-slate-700 leading-tight mt-1">{t.locations?.name || 'Central'}</span>
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TicketComplexityBadge ticket={t} />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span className={`text-[14px] font-semibold ${prio.color}`}>
+                                                                        {prio.label}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span className={`text-[14px] font-semibold ${STATUS_STYLES[t.status] || 'bg-slate-100 text-slate-600'}`}>
+                                                                        {t.status === 'open' ? 'Pendiente' : t.status === 'in_progress' ? 'En Proceso' : t.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {t.attendant ? (
+                                                                        <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest">{t.attendant.full_name}</span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Sin asignar</span>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
+                                                                        {parseTicketDate(t.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}
+                                                                    </span>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })
+                                                )}
+                                            </TableBody>
+                                        </Table>
                                     </div>
                                 </div>
 
@@ -627,9 +913,12 @@ export default function Tickets() {
                                                         <div key={t.id} onClick={() => navigate(`/ticket/${t.id}`)} className="bg-white border border-slate-200 p-4 active:bg-slate-50 transition-all cursor-pointer">
                                                             <div className="flex items-center justify-between mb-2">
                                                                 <span className="text-[10px] font-semibold text-[#002855] uppercase">#TK-{t.id.slice(0, 6)}</span>
-                                                                <span className={`text-[14px] font-semibold ${prio.color}`}>
-                                                                    {prio.label}
-                                                                </span>
+<div className="flex items-center gap-2">
+                                                            <span className={`text-[14px] font-semibold ${prio.color}`}>
+                                                                {prio.label}
+                                                            </span>
+                                                            <TicketComplexityBadge ticket={t} />
+                                                        </div>
                                                             </div>
                                                             <p className="text-[12px] font-semibold text-slate-700 uppercase leading-tight mb-2 line-clamp-2">{t.title}</p>
                                                             <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-2">
@@ -657,6 +946,7 @@ export default function Tickets() {
                                                             <TableHead>Estado</TableHead>
                                                             <TableHead>Atendido por</TableHead>
                                                             <TableHead>Prioridad</TableHead>
+                                                            <TableHead>Complejidad</TableHead>
                                                             <TableHead>Fecha</TableHead>
                                                         </tr>
                                                     </TableHeader>
@@ -690,6 +980,9 @@ export default function Tickets() {
                                                                         <span className={`text-[14px] font-semibold ${prio.color}`}>
                                                                             {prio.label}
                                                                         </span>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <TicketComplexityBadge ticket={t} />
                                                                     </TableCell>
                                                                     <TableCell>
                                                                         <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
@@ -752,9 +1045,10 @@ export default function Tickets() {
                                                         <TableHead>ID</TableHead>
                                                         <TableHead>Incidente</TableHead>
                                                         <TableHead>Estado</TableHead>
-                                                        <TableHead>Solicitante</TableHead>
-                                                        <TableHead>Prioridad</TableHead>
-                                                        <TableHead>Fecha</TableHead>
+                                                                <TableHead>Solicitante</TableHead>
+                                                                <TableHead>Prioridad</TableHead>
+                                                                <TableHead>Complejidad</TableHead>
+                                                                <TableHead>Fecha</TableHead>
                                                     </tr>
                                                 </TableHeader>
                                                 <TableBody>
@@ -776,14 +1070,17 @@ export default function Tickets() {
                                                                         {t.status === 'open' ? 'Pendiente' : t.status === 'in_progress' ? 'En Proceso' : t.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
                                                                     </span>
                                                                 </TableCell>
-                                                                <TableCell>
-                                                                    <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest">{t.requester?.full_name}</span>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <span className={`text-[14px] font-semibold ${prio.color}`}>
-                                                                        {prio.label}
-                                                                    </span>
-                                                                </TableCell>
+<TableCell>
+                                                                        <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest">{t.requester?.full_name}</span>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <span className={`text-[14px] font-semibold ${prio.color}`}>
+                                                                            {prio.label}
+                                                                        </span>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <TicketComplexityBadge ticket={t} />
+                                                                    </TableCell>
                                                                 <TableCell>
                                                                     <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
                                                                         {new Date(String(t.created_at).includes('T') ? String(t.created_at) : `${t.created_at}T12:00:00`).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -829,9 +1126,12 @@ export default function Tickets() {
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
                                                         <span className="text-[8px] sm:text-[9px] font-semibold text-slate-300 uppercase tracking-widest">#TK-{t.id.slice(0, 6)}</span>
-                                                        <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
-                                                            {PRIORITY_STYLES[t.priority]?.label || 'P4'}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                                                {PRIORITY_STYLES[t.priority]?.label || 'P4'}
+                                                            </span>
+                                                            <TicketComplexityBadge ticket={t} />
+                                                        </div>
                                                     </div>
                                                     <h4 className="text-xs sm:text-sm font-semibold text-[#002855] leading-tight mb-2 group-hover:text-blue-600 transition-colors line-clamp-2 uppercase">{t.title}</h4>
                                                     <div className="mb-2">
@@ -896,6 +1196,7 @@ export default function Tickets() {
                                                             <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
                                                                 {PRIORITY_STYLES[t.priority]?.label || 'P4'}
                                                             </span>
+                                                            <TicketComplexityBadge ticket={t} />
                                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                                                         </div>
                                                     </div>
@@ -958,9 +1259,12 @@ export default function Tickets() {
                                                 >
                                                     <div className="flex justify-between items-start mb-2">
                                                         <span className="text-[8px] sm:text-[9px] font-semibold text-emerald-300 uppercase tracking-widest">#TK-{t.id.slice(0, 6)}</span>
-                                                        <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
-                                                            {PRIORITY_STYLES[t.priority]?.label || 'P4'}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                                                {PRIORITY_STYLES[t.priority]?.label || 'P4'}
+                                                            </span>
+                                                            <TicketComplexityBadge ticket={t} />
+                                                        </div>
                                                     </div>
                                                     <h4 className="text-xs sm:text-sm font-semibold text-emerald-900 leading-tight mb-2 line-clamp-2 uppercase">{t.title}</h4>
                                                     <div className="mb-2">
@@ -1048,9 +1352,12 @@ export default function Tickets() {
                                                     <div key={t.id} onClick={() => navigate(`/ticket/${t.id}`)} className="bg-slate-50/30 p-4 sm:p-5 rounded-none border border-slate-200 hover:border-slate-400 shadow-sm transition-all cursor-pointer group">
                                                         <div className="flex justify-between items-start mb-2">
                                                             <span className="text-[8px] sm:text-[9px] font-semibold text-slate-400 uppercase tracking-widest">#TK-{t.id.slice(0, 6)}</span>
-                                                            <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
-                                                                {PRIORITY_STYLES[t.priority]?.label || 'P4'}
-                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-[14px] font-semibold ${PRIORITY_STYLES[t.priority]?.color || 'bg-slate-100 text-slate-600'}`}>
+                                                                    {PRIORITY_STYLES[t.priority]?.label || 'P4'}
+                                                                </span>
+                                                                <TicketComplexityBadge ticket={t} />
+                                                            </div>
                                                         </div>
                                                         <h4 className="text-xs sm:text-sm font-semibold text-slate-700 leading-tight mb-3 sm:mb-4 line-clamp-2 uppercase">{t.title}</h4>
                                                         <div className="space-y-2 sm:space-y-3">
@@ -1164,9 +1471,10 @@ export default function Tickets() {
                                                         <TableHead>ID Ticket</TableHead>
                                                         <TableHead>Incidente</TableHead>
                                                         <TableHead>Estado</TableHead>
-                                                        <TableHead>Solicitante</TableHead>
-                                                        <TableHead>Prioridad</TableHead>
-                                                    </tr>
+<TableHead>Solicitante</TableHead>
+                                                            <TableHead>Prioridad</TableHead>
+                                                            <TableHead>Complejidad</TableHead>
+                                                        </tr>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {filteredTickets.recent.map(t => {
@@ -1193,12 +1501,15 @@ export default function Tickets() {
                                                                         <span className="text-[10px] font-semibold text-slate-700 leading-tight truncate">{t.locations?.name || 'Central'}</span>
                                                                     </div>
                                                                 </TableCell>
-                                                                <TableCell>
-                                                                    <span className={`text-[14px] font-semibold ${prio.color}`}>
-                                                                        {prio.label}
-                                                                    </span>
-                                                                </TableCell>
-                                                            </TableRow>
+<TableCell>
+                                                                        <span className={`text-[14px] font-semibold ${prio.color}`}>
+                                                                            {prio.label}
+                                                                        </span>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <TicketComplexityBadge ticket={t} />
+                                                                    </TableCell>
+                                                                </TableRow>
                                                         );
                                                     })}
                                                 </TableBody>

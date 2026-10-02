@@ -11,6 +11,7 @@
 - [Tiempo Real](#tiempo-real)
 - [Automatización](#automatización)
 - [SLA y Prioridades](#sla-y-prioridades)
+- [Complejidad Técnica (N1/N2/N3)](#complejidad-técnica-n1n2n3)
 - [Permisos y Roles](#permisos-y-roles)
 
 ---
@@ -19,6 +20,9 @@
 
 El módulo de tickets es un sistema completo de gestión de incidencias de soporte técnico que permite:
 - Crear y gestionar tickets de soporte
+- Priorizar los tickets según urgencia (P1–P4) y SLA
+- Estimar automáticamente la complejidad técnica (N1–N3) de los tickets de Sistemas a partir del asunto
+- Reclasificar y escalar el nivel durante la atención (N1 → N2 → N3) por parte de quien atiende
 - Asignar técnicos a incidentes
 - Chat en tiempo real entre solicitantes y técnicos
 - Seguimiento de estado con automatización
@@ -39,7 +43,9 @@ src/modules/tickets/
 │   ├── TicketHistoryPage.tsx # Historial de tickets archivados
 │   └── TicketForm.tsx        # Formulario de creación (en forms/)
 ├── components/
-│   └── TicketDetailModal.tsx # Modal compacto de detalle
+│   ├── TicketDetailModal.tsx # Modal compacto de detalle
+│   ├── ComplexityBadge.tsx   # Badge del nivel de complejidad (N1/N2/N3)
+│   └── SLATimer.tsx          # Cuenta regresiva del SLA
 ├── hooks/
 │   ├── useTicketComments.ts  # Gestión de comentarios y datos
 │   ├── useTicketRealtime.ts  # Suscripciones en tiempo real
@@ -59,6 +65,7 @@ Define todas las estructuras de datos del sistema:
 - `TicketPriority`: Niveles de prioridad (critical, high, medium, low)
 - `TicketStatus`: Estados del ciclo de vida (open, in_progress, resolved, closed, archived)
 - `TicketCategory`: Categorías de tickets (sistemas, contable, legal, operaciones)
+- `TicketComplexity`: Niveles de complejidad técnica (N1, N2, N3)
 
 **Interfaces:**
 - `Ticket`: Estructura principal de un ticket
@@ -71,6 +78,20 @@ Define todas las estructuras de datos del sistema:
 - `SLA_LIMITS`: Límites de tiempo por prioridad (4h, 8h, 24h, 72h)
 - `PRIORITY_LABELS`: Etiquetas legibles para UI
 - `STATUS_LABELS`: Etiquetas de estados para UI
+- `COMPLEXITY_LEVELS`: Niveles de complejidad ordenados (N1, N2, N3)
+- `COMPLEXITY_LABELS`: Etiquetas legibles de los niveles de complejidad
+- `COMPLEXITY_DESCRIPTIONS`: Descripción del tipo de caso de cada nivel
+- `COMPLEXITY_CASES`: Casos de referencia de cada nivel
+- `DEFAULT_COMPLEXITY`: Nivel asignado cuando el asunto no aporta señales (N1)
+- `COMPLEXITY_CATEGORY`: Única categoría a la que aplica la clasificación (sistemas)
+- `FREQUENT_TECH_ISSUES`: Listado de problemas frecuentes de Sistemas (asunto, prioridad y complejidad curada)
+
+**Funciones auxiliares:**
+- `normalizeComplexity(value)`: Normaliza el valor persistido en BD y devuelve `null` si no está clasificado
+- `isComplexityEscalation(from, to)`: Indica si el cambio es un escalamiento (N1 → N2/N3)
+- `estimateComplexityFromTitle(title)`: Estima el nivel por palabras clave del asunto
+- `resolveComplexityFromTitle(title, category)`: Resuelve el nivel (listado → palabras clave → provisional)
+- `describeComplexityEstimate(estimate)`: Explica en lenguaje natural cómo se obtuvo el nivel
 
 ---
 
@@ -108,8 +129,16 @@ Define todas las estructuras de datos del sistema:
 - Pestañas: Dashboard, Mis Tickets, Reportes
 - Drag & drop para cambiar estado de tickets
 - Métricas en tiempo real (tasa de resolución, tiempo promedio)
+- Distribución por nivel de complejidad (N1/N2/N3) y tabla por ticket con filtro por nivel del área de Sistemas
 - Exportación a PDF y Excel
 - Automatización de estados (resolved→closed→archived)
+
+**Estado local relevante:**
+- `startDate` / `endDate`: Rango de fechas del reporte
+- `reportComplexity`: Filtro de complejidad del reporte (`''`, `N1`, `N2`, `N3` o `__none__`)
+- `metricsData.complexityDistribution`: Conteo por nivel en el periodo
+- `metricsData.unclassifiedComplexity`: Tickets de Sistemas sin clasificar
+- `reportComplexityRows`: Filas de la tabla de detalle, ya filtradas
 
 **Estado local:**
 - `tickets`: Lista de todos los tickets
@@ -132,6 +161,7 @@ Define todas las estructuras de datos del sistema:
 **Funcionalidades:**
 - Chat en tiempo real con editor de texto enriquecido
 - Gestión de estado (atender, resolver, cerrar, finalizar)
+- Clasificación de complejidad técnica (N1/N2/N3) con escalamiento durante la atención
 - Panel de participantes y asignaciones
 - Subida de imágenes con pegado desde portapapeles
 - Detección de @menciones para notificaciones
@@ -161,7 +191,7 @@ Define todas las estructuras de datos del sistema:
 
 **Funcionalidades:**
 - Lista de tickets con estado "archived"
-- Filtros por búsqueda, prioridad y rango de fechas
+- Filtros por búsqueda, prioridad, nivel de complejidad y rango de fechas
 - Exportación a PDF y Excel del historial
 - Cálculo de tiempo de resolución por ticket
 - Refresco manual de datos
@@ -170,6 +200,7 @@ Define todas las estructuras de datos del sistema:
 - `archivedTickets`: Lista de tickets archivados
 - `searchTerm`: Término de búsqueda
 - `filterPriority`: Filtro por prioridad
+- `filterComplexity`: Filtro por nivel de complejidad
 - `filterDateRange`: Rango de fechas predefinido
 - `startDate/endDate`: Rango personalizado
 
@@ -185,8 +216,10 @@ Define todas las estructuras de datos del sistema:
 **Formulario de creación de nuevos tickets**
 
 **Funcionalidades:**
-- Campos: título, descripción, prioridad, categoría, sede, AnyDesk
-- Auto-sugerencia de problemas frecuentes
+- El asunto ocupa todo el ancho y va primero: determina el tipo de soporte
+- Campos: asunto, descripción, prioridad, categoría, sede, AnyDesk
+- El solicitante NO ve ni elige el nivel de complejidad: se resuelve sola por asunto
+- Auto-sugerencia de problemas frecuentes (listado de Sistemas)
 - Auto-asignación de sede del usuario
 - Validación de campos obligatorios
 - Guarda AnyDesk como comentario inicial
@@ -198,12 +231,13 @@ Define todas las estructuras de datos del sistema:
 - `locations`: Lista de sedes disponibles
 - `errors`: Errores de validación
 - `showSuggestions`: Visibilidad de sugerencias
+- `complexityEstimate`: Nivel resuelto en vivo (no se muestra, solo se persiste)
 
 **Funciones clave:**
 - `fetchLocations()`: Carga sedes desde DB
-- `handleSelectIssue()`: Selecciona sugerencia
-- `handleSubmit()`: Crea ticket con validación
-- `handleChange()`: Maneja cambios en campos
+- `handleSelectIssue()`: Selecciona una sugerencia del listado
+- `handleSubmit()`: Crea ticket con validación y persiste el nivel resuelto
+- `handleChange()`: Maneja cambios en campos y muestra sugerencias
 
 ---
 
@@ -212,6 +246,7 @@ Define todas las estructuras de datos del sistema:
 
 **Funcionalidades:**
 - Vista compacta con pestañas (detalles/chat)
+- Badge de prioridad y de complejidad (N1/N2/N3)
 - Chat en tiempo real básico
 - Gestión de estado del ticket
 - Subida de imágenes
@@ -229,6 +264,27 @@ Define todas las estructuras de datos del sistema:
 - `handleSendComment()`: Envía comentarios
 - `handleDeleteTicket()`: Elimina con permisos
 - `handleStatusUpdate()`: Cambia estado
+
+---
+
+### 6. ComplexityBadge.tsx
+**Badge visual del nivel de complejidad técnica**
+
+**Funcionalidades:**
+- Muestra `N1`, `N2`, `N3` o la etiqueta completa (`variant="full"`)
+- Paleta propia del eje de complejidad (verde / azul / violeta)
+- `title` con la descripción del nivel
+- Renderiza "Sin clasificar" cuando el ticket aún no tiene nivel
+- Ignora de forma segura valores nulos o no reconocidos
+
+**Props:**
+```typescript
+{
+  level?: string | null;   // Valor persistido en tickets.complexity_level
+  variant?: 'code' | 'full';
+  className?: string;
+}
+```
 
 ---
 
@@ -323,7 +379,7 @@ Usuario → TicketForm.tsx
   ↓
 Validación de campos
   ↓
-Insert en tabla 'tickets' (status: 'open')
+Insert en tabla 'tickets' (status: 'open', complexity_level: N1/N2/N3 si category = 'sistemas')
   ↓
 Insert en 'ticket_comments' (si hay AnyDesk)
   ↓
@@ -350,7 +406,30 @@ Notificación en tiempo real a participantes
 Actualización de UI vía Supabase Realtime
 ```
 
-### 3. Chat en Tiempo Real
+### 3. Clasificación por Complejidad
+
+```
+Solicitante escribe el asunto (campo principal del formulario)
+  ↓
+resolveComplexityFromTitle(asunto, categoría)
+  ├── fuera de Sistemas → null
+  ├── asunto en FREQUENT_TECH_ISSUES (exacto o parcial) → complejidad curada
+  └── asunto personalizado → estimateComplexityFromTitle(asunto)
+  ↓
+TicketForm: INSERT 'tickets' con complexity_level (silencioso, sin mostrarlo)
+  ↓
+Técnico → TicketDetailPage.tsx (sección "Complejidad Técnica")
+  ↓
+Clic en N1 / N2 / N3 (solo quien atiende, no el creador, no archivados)
+  ↓
+UPDATE en 'tickets' (complexity_level)
+  ↓
+Insert en 'ticket_comments' (**ESCALADO** o **CLASIFICADO**)
+  ↓
+Badge actualizado en dashboard, historial y modal
+```
+
+### 4. Chat en Tiempo Real
 
 ```
 Usuario → TicketDetailPage.tsx
@@ -474,6 +553,222 @@ const timeRemaining = SLA_LIMITS[priority].hours - hoursElapsed;
 
 ---
 
+## Complejidad Técnica (N1/N2/N3)
+
+### Concepto
+
+La prioridad y la complejidad son **ejes ortogonales**:
+
+| Eje | Campo | Responde a | Efecto |
+|-----|-------|------------|--------|
+| Urgencia | `priority` | ¿Cuánto afecta ahora? | Define el SLA de respuesta (P1–P4) |
+| Complejidad | `complexity_level` | ¿Qué tipo de soporte requiere? | Define el nivel de atención y si interviene un proveedor |
+
+Un caso puede ser **urgente y simple** (P1 + N1: caída de un servicio de recepción con procedimiento conocido) o
+**urgente y complejo** (P1 + N3: caída de un servidor que afecta a una sede completa).
+
+### Alcance
+
+La clasificación aplica **únicamente a `category = 'sistemas'`**. Las áreas contable, legal y operaciones
+conservan su `complexity_level` en `NULL` porque el nivel de complejidad técnico no las describe.
+
+### Niveles
+
+| Nivel | Etiqueta | Descripción | Casos de referencia |
+|-------|----------|-------------|---------------------|
+| N1 | N1 - Soporte básico | Casos conocidos, repetitivos y con procedimiento definido. | Cambio de usuario, configuración básica, problemas con periféricos, problemas básicos de impresión, acceso básico a determinados recursos |
+| N2 | N2 - Soporte técnico | Casos que requieren diagnóstico técnico e intervención remota o presencial. | Computadoras lentas, problemas de internet y conectividad, fallas de impresoras que requieren diagnóstico, instalación/configuración de impresoras, problemas de cámaras, fallas de biométricos, problemas de Check List, configuración de biométricos, problemas de acceso a sistemas |
+| N3 | N3 - Soporte especializado | Casos que requieren intervención avanzada, infraestructura, administración de sistemas o participación de proveedores. | Intervención sobre servidores o infraestructura, administración avanzada de sistemas, modificaciones o intervenciones a nivel de sistemas, incidencias que requieren proveedor especializado, incidencias que afectan a una sede completa o a varios usuarios, fallas de servicios tecnológicos críticos |
+
+### Estimación automática por asunto
+
+El **solicitante nunca ve ni elige el nivel**. El formulario no muestra N1/N2/N3 en ningún momento:
+el sistema resuelve la complejidad internamente a partir del asunto (título).
+
+El asunto es, por eso, el campo principal del formulario: ocupa todo el ancho, va primero y lleva una
+ayuda que indica que de él depende el tipo de soporte que se asignará.
+
+```
+Asunto escrito
+  ↓
+¿El área es "Sistemas"?
+  ├── No → complexity_level = NULL (no se clasifica)
+  └── Sí → ¿El asunto está en el listado de problemas frecuentes?
+              ├── Sí → se usa la complejidad ya curada de ese caso
+              └── No (asunto personalizado) → estimación por palabras clave
+                      ↓
+              sin señales → N1 provisional
+  ↓
+INSERT tickets.complexity_level
+```
+
+El listado de referencia es `FREQUENT_TECH_ISSUES` (6 casos curados de Sistemas). La coincidencia con el
+listado acepta el asunto exacto o una versión recortada del mismo, de modo que el solicitante obtiene la
+clasificación correcta aun sin seleccionar la sugerencia.
+
+Si el asunto **no está en el listado** y es un caso personalizado, entra el motor de palabras clave:
+
+- Las palabras **fuertes** (peso 2) describen señales inequívocas: `servidor`, `base de datos`, `virus`,
+  `proveedor`, `todos los usuarios`, `contrasena`, `toner`, `no imprime`, `instalar`, etc.
+- Las palabras de contexto (peso 1) suman apoyo: `impresora`, `internet`, `excel`, `camara`, `error`.
+- En empate gana el **nivel más alto**: el técnico siempre puede bajar la clasificación, nunca tiene que
+  adivinar que el caso era más complejo.
+- Si el asunto no contiene ninguna señal, se asigna `N1` de forma provisional (`source: 'default'`).
+
+Ejemplos:
+
+| Asunto | Área | Nivel | Origen |
+|--------|------|-------|--------|
+| Impresora no enciende / no imprime | Sistemas | N2 | listado |
+| olvide mi contraseña | Sistemas | N1 | listado (coincidencia parcial) |
+| No hay tóner en la impresora | Sistemas | N1 | palabras clave (personalizado) |
+| La computadora de la recepción está muy lenta | Sistemas | N2 | palabras clave (personalizado) |
+| El servidor se cayó y afecta a toda la sede | Sistemas | N3 | palabras clave (personalizado) |
+| Factura duplicada del cliente | Contable | — | sin complejidad |
+| Hola buen día | Sistemas | N1 | provisional |
+
+Durante la atención, `TicketDetailPage` vuelve a resolver la estimación desde el asunto persistido para
+mostrar por qué se asignó ese nivel (`describeComplexityEstimate`).
+
+### Visibilidad del nivel
+
+| Momento | Quién ve el nivel | Qué puede hacer |
+|---------|-------------------|-----------------|
+| Creación del ticket | Nadie. Ni un badge, ni un texto, ni un selector. | — |
+| Detalle del ticket | Todos | Solo lectura del nivel y de su razón |
+| Detalle del ticket | Quien puede atender y no es el creador | Reclasificar N1 / N2 / N3 por diagnóstico |
+| Dashboard, historial y modal | Todos | Solo lectura (badge) |
+
+### Ticket previos (migración aplicada)
+
+La migración **no modifica ninguna fila existente**:
+
+- La columna se agrega como `NULL` y sin valor por defecto.
+- No hay `UPDATE` ni backfill: los tickets anteriores quedan exactamente como estaban.
+- Los tickets de Sistemas previos se muestran como **"Sin clasificar"** hasta que un técnico los clasifique.
+- Los tickets de otras áreas siempre muestran `—` (no aplican).
+
+### Estado pendiente de la migración
+
+Mientras `20261001000001_add_complexity_level_to_tickets.sql` no esté aplicada en el proyecto, la aplicación
+degrada sin romperse:
+
+- El insert del ticket **no** incluye `complexity_level`; la clasificación se aplica después como
+  actualización de mejor esfuerzo, cuyo error se ignora.
+- Las lecturas usan `select('*')` en lugar de una lista explícita de columnas, para que una columna
+  ausente no invalide la consulta completa del dashboard.
+
+Si ves el error `Could not find the 'complexity_level' column of 'tickets' in the schema cache`, aplica la
+migración. Si el error persiste después de aplicarla, ejecuta `NOTIFY pgrst, 'reload schema';` para
+recargar el cache de PostgREST.
+
+### Escalamiento
+
+La clasificación parte de la estimación automática y **puede escalarse durante la atención**
+de N1 a N2 o N3 cuando el diagnóstico revele que se requiere una intervención de mayor nivel.
+
+```
+Ticket creado (nivel estimado por el asunto)
+  ↓
+El técnico atiende y diagnostica
+  ↓
+¿Requiere mayor nivel de intervención?
+  ├── No → se mantiene el nivel
+  └── Sí → TicketDetailPage: botones N1 / N2 / N3
+              ↓
+          UPDATE tickets SET complexity_level = 'N2'
+              ↓
+          INSERT ticket_comments (**ESCALADO**: ... N1 → N2)
+              ↓
+          Registros de Sistema en el feed + badge actualizado en el dashboard
+```
+
+Detalles de la implementación:
+
+- Solo quien puede atender el ticket (rol con `canManageStatus` **y** que no sea el creador) reclasifica.
+- No se permite reclasificar tickets archivados.
+- Cada cambio queda auditado en `ticket_comments` con los prefijos `**ESCALADO**` (subida de nivel) o
+  `**CLASIFICADO**` (reevaluación), que el chat renderiza como "Registro de Sistema".
+- La columna es `NULL` cuando el ticket aún no fue clasificado; la UI muestra "Sin clasificar".
+
+### Persistencia
+
+```sql
+-- Migración: 20261001000001_add_complexity_level_to_tickets.sql
+ALTER TABLE tickets ADD COLUMN complexity_level text;
+
+ALTER TABLE tickets ADD CONSTRAINT tickets_complexity_level_check
+    CHECK (complexity_level IS NULL OR complexity_level IN ('N1', 'N2', 'N3'));
+
+CREATE INDEX idx_tickets_complexity_level ON tickets (complexity_level);
+CREATE INDEX idx_tickets_category_complexity_level ON tickets (category, complexity_level);
+```
+
+Se persisten los códigos (`'N1'`, `'N2'`, `'N3'`) como texto, igual que `status` y `priority`.
+
+### Paleta visual
+
+La complejidad usa una paleta propia para no confundirse con la escala de prioridad:
+
+| Nivel | Color | Uso |
+|-------|-------|-----|
+| N1 | Verde (`emerald`) | Soporte básico |
+| N2 | Azul (`sky`) | Soporte técnico |
+| N3 | Violeta (`violet`) | Soporte especializado |
+
+### Visualización
+
+| Superficie | Comportamiento |
+|------------|----------------|
+| `TicketForm.tsx` | El asunto ocupa todo el ancho con una ayuda que explica que define el tipo de soporte. Ninguna referencia a N1/N2/N3. El nivel se resuelve y persiste en silencio |
+| `TicketDetailPage.tsx` | Sección compacta: badge del nivel + combo "Cambiar nivel" (solo quien atiende). El detalle (descripción, casos de referencia y razón de la estimación) queda oculto tras "Mostrar más información" |
+| `TicketsPage.tsx` | Badge en las tarjetas Kanban, columna "Complejidad" en las tablas, panel de distribución + tabla por ticket con filtro por nivel en Reportes, y columna en PDF/Excel |
+| `TicketHistoryPage.tsx` | Badge en móvil y escritorio, filtro por nivel y columna en PDF/Excel |
+| `TicketDetailModal.tsx` | Badge junto a la prioridad en el encabezado |
+
+La sección de complejidad del detalle es deliberadamente escueta: la acción (el combo "Cambiar nivel") está
+siempre visible y todo el texto explicativo se colapsa en el desplegable `showComplexityInfo`, para no
+distraer durante la atención.
+
+### Reportes por nivel
+
+La pestaña **Reportes** incluye dos bloques sobre complejidad, ambos restringidos al área de Sistemas:
+
+1. **Distribución por Nivel de Complejidad**: tres tarjetas con el volumen de N1, N2 y N3 del periodo,
+   más un aviso con los tickets aún sin clasificar.
+2. **Detalle por Nivel de Complejidad**: tabla con los tickets del periodo y su nivel (ID, incidente,
+   complejidad, prioridad, estado, atendido por, fecha). Filas navegables al detalle.
+
+El segundo bloque tiene un filtro por nivel: `Todos`, `N1`, `N2`, `N3` y `Sin clasificar`
+(`reportComplexity`). Al elegir un nivel, las áreas distintas de Sistemas quedan fuera del reporte porque
+no manejan complejidad.
+
+### Descargas (PDF / Excel)
+
+Ambas descargas usan el mismo alcance que la tabla en pantalla (`reportFilteredTickets`): rango de fechas
++ filtro de complejidad. Lo que ves en pantalla es lo que se descarga.
+
+**PDF** (`generatePDF`):
+- Encabezado con rango de fechas y el nivel filtrado (`Nivel de Complejidad: ...`).
+- Métricas del periodo y **Distribución por Nivel de Complejidad** calculada sobre las filas exportadas,
+  para que cuadre con la tabla.
+- Tabla `ID | Incidente | Estado | Prioridad | Complejidad | Fecha` con los primeros 100 tickets; si hay
+  más, deja un aviso en el documento indique cuántos son.
+- Posiciones verticales calculadas a partir del bloque anterior, para que el contenido no se solape.
+
+**Excel** (`generateExcel`), tres hojas:
+1. `Filtros` — rango, filtro de complejidad, tickets en el reporte y tickets de Sistemas.
+2. `Tickets` — una fila por ticket, incluyendo `Área`, `Complejidad`, `Solicitante`, `Ubicación`, `Atendido Por`
+   y fechas de creación/cierre.
+3. `Resumen Complejidad` — conteo y porcentaje por N1/N2/N3 más `Sin clasificar`.
+
+**Helper de fechas** (`parseTicketDate`): las fechas guardadas como texto simple (`2026-05-04`) se parsean
+al mediodía para no mostrar el día anterior por desfase de zona horaria. Aplica a la tabla, al PDF y al Excel.
+
+**Helper de etiqueta** (`complexityReportLabel`): Sistemas sin nivel → `Sin clasificar`; otras áreas → `N/A`.
+
+---
+
 ## Permisos y Roles
 
 ### Roles del Sistema
@@ -555,7 +850,7 @@ const timeRemaining = SLA_LIMITS[priority].hours - hoursElapsed;
 ### Para Usuarios
 
 1. **Crear tickets:**
-   - Usar títulos descriptivos
+   - Usar títulos descriptivos: el asunto determina el nivel de complejidad
    - Incluir detalles del problema
    - Proporcionar ID de AnyDesk si aplica
    - Seleccionar prioridad adecuada
@@ -565,6 +860,7 @@ const timeRemaining = SLA_LIMITS[priority].hours - hoursElapsed;
    - Actualizar estado al progresar
    - Documentar soluciones en comentarios
    - Cerrar tickets cuando estén resueltos
+   - Reclasificar la complejidad (N1 → N2 → N3) si el diagnóstico exige mayor nivel
 
 ---
 

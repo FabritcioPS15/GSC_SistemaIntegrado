@@ -27,7 +27,6 @@ export default function DynamicAssetForm({ onClose, onSaved, editAsset, initialC
   const form = useDynamicAssetForm({ editAsset, initialCategoryId, onSaved });
   const [tipoActivoSearch, setTipoActivoSearch] = useState('');
   const [tieneGarantia, setTieneGarantia] = useState(!!(editAsset && form.formData.garantia_hasta));
-  const [areaEsOtro, setAreaEsOtro] = useState(false);
 
   // Categorías ordenadas alfabéticamente (Otros Activos siempre al final)
   const sortedCategories = useMemo(() => {
@@ -38,11 +37,89 @@ export default function DynamicAssetForm({ onClose, onSaved, editAsset, initialC
     });
   }, [form.categories]);
 
-  const areaOptions = form.areas
-    .filter(area => area.location_id === form.formData.location_id)
-    .map(area => area.name);
+  // Sede seleccionada para obtener su rubro/tipo de negocio
+  const selectedLocation = useMemo(() => {
+    return form.locations.find(l => l.id === form.formData.location_id);
+  }, [form.locations, form.formData.location_id]);
+
+  // Áreas predefinidas según el rubro de la empresa/sede
+  const PRESET_AREAS_BY_BUSINESS_TYPE: Record<string, string[]> = useMemo(() => ({
+    revisiones_tecnicas: [
+      'Línea 1',
+      'Línea 2',
+      'Counter',
+      'Oficina Administrativa',
+      'Almacén',
+      'Sala de espera',
+      'Servicios Higiénicos',
+    ],
+    escuela_conductores: [
+      'Aula 1',
+      'Aula 2',
+      'Counter',
+      'Oficina Administrativa',
+      'Almacén',
+      'Sala de espera',
+      'Simulador',
+      'Servicios Higiénicos',
+    ],
+    policlinico: [
+      'Consultorio Médico',
+      'Triaje',
+      'Psicosensométrico',
+      'Laboratorio',
+      'Counter',
+      'Oficina Administrativa',
+      'Almacén',
+      'Sala de espera',
+      'Servicios Higiénicos',
+    ],
+    circuito_de_manejo: [
+      'Pista / Circuito',
+      'Caseta de Control',
+      'Counter',
+      'Sala de Espera',
+      'Servicios Higiénicos',
+    ],
+    oficinas_administrativas: [
+      'Gerencia / Dirección',
+      'Contabilidad / Finanzas',
+      'Recursos Humanos',
+      'Sistemas / TI',
+      'Recepción / Counter',
+      'Sala de Reuniones',
+      'Almacén / Archivo',
+      'Servicios Higiénicos',
+    ],
+  }), []);
+
+  const areaOptions = useMemo(() => {
+    const dbAreas = form.areas
+      .filter(area => area.location_id === form.formData.location_id)
+      .map(area => area.name);
+
+    const bt = selectedLocation?.business_type || '';
+    const presetAreas = PRESET_AREAS_BY_BUSINESS_TYPE[bt] || [
+      'Línea 1',
+      'Línea 2',
+      'Counter',
+      'Oficina Administrativa',
+      'Almacén',
+      'Sala de espera',
+      'Servicios Higiénicos',
+    ];
+
+    return Array.from(new Set([...dbAreas, ...presetAreas]));
+  }, [form.areas, form.formData.location_id, selectedLocation, PRESET_AREAS_BY_BUSINESS_TYPE]);
+
   const areaValue = form.formData.area_ubicacion;
   const areaEsCustom = !!areaValue && areaValue !== '__otro__' && !areaOptions.includes(areaValue);
+
+  // Normalizar áreas personalizadas antiguas a "Otro" para no permitir texto libre
+  useEffect(() => {
+    if (areaEsCustom) form.setField('area_ubicacion', 'Otro');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaEsCustom]);
 
   const currentCategoryObj = form.categories.find(cat => cat.id === form.formData.category_id) as any;
   const currentCategory = CATEGORIAS_CONFIG.find(c => c.key === currentCategoryObj?.slug);
@@ -375,28 +452,18 @@ export default function DynamicAssetForm({ onClose, onSaved, editAsset, initialC
           <FormField label="Área de Ubicación">
             <FormSelect
               name="area_ubicacion"
-              value={areaEsOtro || areaEsCustom ? '__otro__' : areaValue}
+              value={areaValue === 'Otro' || areaEsCustom ? '__otro__' : areaValue}
               onChange={(e) => {
                 const v = e.target.value;
-                setAreaEsOtro(v === '__otro__');
-                if (v !== '__otro__') form.setField('area_ubicacion', v);
+                form.setField('area_ubicacion', v === '__otro__' ? 'Otro' : v);
               }}
             >
               <option value="">Seleccionar...</option>
               {areaOptions.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
-              <option value="__otro__">Otro...</option>
+              <option value="__otro__">Otro</option>
             </FormSelect>
-            {(areaEsOtro || areaEsCustom) && (
-              <FormInput
-                name="area_ubicacion_custom"
-                value={areaEsCustom ? areaValue : ''}
-                onChange={(e) => form.setField('area_ubicacion', e.target.value)}
-                placeholder="Escribir área..."
-                className="mt-2"
-              />
-            )}
           </FormField>
         </FormSection>
       </div>

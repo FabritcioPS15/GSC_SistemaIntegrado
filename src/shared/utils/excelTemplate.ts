@@ -15,7 +15,12 @@ export const generateAndDownloadTemplate = async () => {
         const { data: subcategoriesData } = await supabase.from('subcategories').select('name');
 const { data: locationsData } = await supabase.from('locations').select('name').eq('is_active', true);
 
-        const areasList = [...new Set([...(areasData || []).map(a => a.name), 'Línea de inspección', 'Recepción'])].filter(Boolean);
+        const defaultAreas = [
+          'Línea 1', 'Línea 2', 'Counter', 'Oficina Administrativa', 'Almacén',
+          'Sala de espera', 'Servicios Higiénicos', 'Aula 1', 'Aula 2',
+          'Consultorio Médico', 'Triaje', 'Psicosensométrico', 'Laboratorio', 'Pista / Circuito'
+        ];
+        const areasList = [...new Set([...(areasData || []).map(a => a.name), ...defaultAreas])].filter(Boolean);
         const typesList = [...new Set((assetTypesData || []).map(t => t.name))].filter(Boolean);
         const catList = ['Tecnología', 'Seguridad y Control', 'Equipos de línea', 'Mobiliario', 'Útiles y Suministros'];
         const subcatList = [...new Set((subcategoriesData || []).map(s => s.name))].filter(Boolean);

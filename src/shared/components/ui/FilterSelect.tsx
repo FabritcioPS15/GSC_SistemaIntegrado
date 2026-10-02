@@ -59,7 +59,7 @@ export default function FilterSelect({
 
   // The first empty-value option ("TODAS LAS SEDES", etc.) acts as the "clear" row
   const placeholder = options.find(o => o.value === '');
-  const selectableOptions = multiple ? options.filter(o => o.value !== '') : options;
+  const selectableOptions = options.filter(o => o.value !== '');
 
   const selectedValues = multiple
     ? Array.isArray(value) ? value : []

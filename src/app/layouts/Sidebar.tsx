@@ -50,6 +50,8 @@ interface SubmenuItem {
   path: string;
   hasSubmenu?: boolean;
   submenu?: SubmenuItem[];
+  /** Los items estructurales no muestran el botón de eliminar. */
+  noDelete?: boolean;
 }
 
 interface MenuItem {
@@ -80,6 +82,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
     { id: 'checklist-escon', label: 'ESCON', path: '/checklist/escon' },
     { id: 'checklist-ecsal', label: 'ECSAL', path: '/checklist/ecsal' },
     { id: 'checklist-citv', label: 'CITV', path: '/checklist/citv' },
+    { id: 'checklist-comentarios', label: 'Comentarios', path: '/checklist/comentarios', noDelete: true },
   ]);
 
   const handleDeleteChecklistItem = (id: string) => {
@@ -163,6 +166,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
             { id: 'checklist-escon', label: 'ESCON', path: '/checklist/escon' },
             { id: 'checklist-ecsal', label: 'ECSAL', path: '/checklist/ecsal' },
             { id: 'checklist-citv', label: 'CITV', path: '/checklist/citv' },
+            { id: 'checklist-comentarios', label: 'Comentarios', path: '/checklist/comentarios', noDelete: true },
           ]
         },
       ]
@@ -386,13 +390,15 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
                                       <div className={`w-1 h-1 rounded-full ${sub.path === location.pathname ? 'bg-blue-400' : 'bg-slate-600'}`} />
                                       {sub.label}
                                     </NavLink>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteChecklistItem(sub.id); }}
-                                      className="p-1 hover:text-red-400"
-                                      aria-label={`Eliminar ${sub.label}`}
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
+                                    {!sub.noDelete && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteChecklistItem(sub.id); }}
+                                        className="p-1 hover:text-red-400"
+                                        aria-label={`Eliminar ${sub.label}`}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
                                   </div>
                                 ))
                               ) : (
