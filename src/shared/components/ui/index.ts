@@ -7,6 +7,8 @@
  */
 
 export { default as ActionToolbar } from './ActionToolbar';
+export { default as ActionsDropdown } from './ActionsDropdown';
+export type { ActionsDropdownProps, ExtraAction, SelectionModeConfig } from './ActionsDropdown';
 export { default as Breadcrumbs } from './Breadcrumbs';
 export { default as DateRangeFilter } from './DateRangeFilter';
 export type { DateRange } from './DateRangeFilter';
@@ -16,6 +18,7 @@ export { default as ExportButtons } from './ExportButtons';
 export * from './Table';
 export { default as FilterBar } from './FilterBar';
 export { default as FilterSelect } from './FilterSelect';
+export { default as Loader } from './Loader';
 export { default as LoadingSpinner } from './LoadingSpinner';
 export { default as ModalOverlay } from './ModalOverlay';
 export { default as Pagination } from './Pagination';

@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable';
 import VehicleImportModal from '../components/VehicleImportModal';
 import FlotaVehicularForm from '../forms/FlotaVehicularForm';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import { supabase, Location } from '../../../shared/services/supabase';
 import { BUSINESS_TYPE_LABELS } from '../../../shared/types/inventory.types';
 import { useAuth } from '../../../app/providers/AuthContext';
@@ -18,11 +19,10 @@ import DetailModal, {
   StandardModalFooter,
 } from '../../../shared/components/ui/DetailModal';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import {
   Table,
   TableHeader,
@@ -973,14 +973,6 @@ export default function FlotaVehicular() {
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
           {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
-
-          {canEdit() && (
             <button
               onClick={() => { setEditing(undefined); setView(view === 'form' ? 'list' : 'form'); }}
               className={`w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${view === 'form' ? 'bg-slate-800 text-white' : 'bg-[#002855] text-white hover:bg-blue-800'}`}
@@ -990,7 +982,19 @@ export default function FlotaVehicular() {
             </button>
           )}
 
-          <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPdf}
+          />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && viewMode === 'table' && (
             <button
@@ -1069,9 +1073,7 @@ export default function FlotaVehicular() {
         ) : (
           <div className="space-y-6 animate-in fade-in duration-500">
             {loading ? (
-              <div className="flex items-center justify-center min-h-[40vh]">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
-              </div>
+              <LoadingSpinner label="Cargando flota vehicular..." />
             ) : viewMode === 'table' ? (
               <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-300">
                 <div className="bg-slate-50/50 border-b border-slate-100 shrink-0">

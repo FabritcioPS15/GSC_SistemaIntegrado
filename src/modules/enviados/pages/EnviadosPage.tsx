@@ -3,6 +3,7 @@ import { Edit, Trash2, MapPin, Package, Truck, X, Calendar, Plus, LayoutGrid, Li
 import { useHeaderVisible } from '../../../shared/hooks/useHeaderVisible';
 import { supabase, AssetWithDetails, Location } from '../../../shared/services/supabase';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import ShipmentForm from '../forms/ShipmentForm';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
@@ -271,9 +272,7 @@ export default function Enviados({ locationFilter }: EnviadosProps) {
               </div>
 
               {loading ? (
-                <div className="flex items-center justify-center min-h-[40vh]">
-                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-[#002855]"></div>
-                </div>
+                <LoadingSpinner label="Cargando envíos..." />
               ) : filteredShipments.length === 0 ? (
                 <div className="bg-white border-2 border-dashed border-gray-200 rounded-none p-20 text-center">
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">

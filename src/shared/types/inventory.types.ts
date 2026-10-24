@@ -6,7 +6,8 @@ export type BusinessType =
   | 'polclinico'
   | 'escuela_conductores'
   | 'oficinas_administrativas'
-  | 'circuito_de_manejo';
+  | 'circuito_de_manejo'
+  | 'almacen_general'
 
 export interface Company {
   id: string;
@@ -333,11 +334,12 @@ export interface PaginatedResponse<T> {
 
 // Constants
 export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
-  revisiones_tecnicas: 'CITV (Revisiones Técnicas)',
-  escuela_conductores: 'ESCON (Escuela de Conductores)',
-  polclinico: 'ECSAL (Policlínicos)',
-  oficinas_administrativas: 'Oficinas Administrativas',
-  circuito_de_manejo: 'Circuito de Manejo'
+  almacen_general: 'ALMACÉN GENERAL',
+  oficinas_administrativas: 'OFICINAS CENTRALES',
+  circuito_de_manejo: 'CIRCUITOS DE MANEJO',
+  revisiones_tecnicas: 'REVISIONES TÉCNICAS',
+  escuela_conductores: 'ESCUELAS DE CONDUCTORES',
+  polclinico: 'POLICLÍNICOS',
 };
 
 export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {

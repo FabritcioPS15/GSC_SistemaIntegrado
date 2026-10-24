@@ -5,6 +5,7 @@ import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import { useNavigate } from 'react-router-dom';
 import TemplateManager from '../../../shared/components/TemplateManager';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 
 type ChecklistItem = {
   id: string;
@@ -670,10 +671,7 @@ export default function ChecklistInteractive() {
             </div>
 
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-24">
-                <div className="w-10 h-10 border-4 border-slate-100 border-t-blue-600 rounded-none animate-spin mb-4"></div>
-                <p className="text-[10px] font-normal text-slate-400 uppercase tracking-[0.2em]">Sincronizando expedientes...</p>
-              </div>
+              <LoadingSpinner label="Cargando checklist..." />
             ) : history.length === 0 ? (
               <div className="text-center py-24">
                 <div className="w-16 h-16 bg-slate-50 rounded-none flex items-center justify-center mx-auto mb-6 border border-slate-100">

@@ -8,8 +8,8 @@ import { useAuth } from '../../../app/providers/AuthContext';
 import LocationForm from '../forms/LocationForm';
 import {
   ActionToolbar,
+  ActionsDropdown,
   ViewToggle,
-  ExportButtons,
   LoadingSpinner,
   PrimaryButton,
   RowActions,
@@ -35,7 +35,6 @@ import DetailModal, {
   DetailModalRow,
 } from '../../../shared/components/ui/DetailModal';
 import { useNotify } from '../../../shared/hooks/useNotify';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 
 export default function Sedes() {
@@ -432,24 +431,28 @@ export default function Sedes() {
             <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
             {canEdit() && (
-              <SelectionModeButton
-                active={selectionMode}
-                onClick={handleToggleSelectionMode}
-                selectedCount={selectedIds.length}
-              />
-            )}
-
-            {canEdit() && (
               <PrimaryButton icon={Plus} onClick={openCreate}>
                 Nueva Sede
               </PrimaryButton>
             )}
 
-            <ExportButtons onExportExcel={exportToExcel} onExportPDF={exportToPdf} />
+            <ActionsDropdown
+              selectionMode={
+                canEdit()
+                  ? {
+                      active: selectionMode,
+                      onToggle: handleToggleSelectionMode,
+                      selectedCount: selectedIds.length,
+                    }
+                  : undefined
+              }
+              onExportExcel={exportToExcel}
+              onExportPDF={exportToPdf}
+            />
           </ActionToolbar>
 
           {loading ? (
-            <LoadingSpinner />
+            <LoadingSpinner label="Cargando sedes..." />
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-1">
               {paginatedData.map(loc => {

@@ -1,8 +1,9 @@
 
 
 import { ReactNode, useState, useRef, useCallback } from 'react';
-import { Check, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import ModalOverlay from '../ui/ModalOverlay';
+import Loader from '../ui/Loader';
 import { DetailModalHeader, DetailModalBody } from '../ui/DetailModal';
 
 export type StepDefinition = {
@@ -220,7 +221,7 @@ export default function MultiStepForm({
                   disabled={loading || submitting}
                   className="flex items-center gap-2 px-8 py-2.5 min-h-[44px] text-[10px] font-normal uppercase tracking-wide text-white bg-blue-600 hover:bg-blue-700 transition-all disabled:opacity-50 shadow-lg"
                 >
-                  {(loading || submitting) && <Loader2 size={14} className="animate-spin" />}
+                  {(loading || submitting) && <Loader size={14} />}
                   {(loading || submitting) ? 'Guardando...' : 'Guardar'}
                 </button>
               )}

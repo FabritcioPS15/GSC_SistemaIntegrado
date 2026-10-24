@@ -1,8 +1,9 @@
 
 
 import { ReactNode, Children, isValidElement, useRef, useState, useEffect, useMemo } from 'react';
-import { X, AlertCircle, Loader2, ChevronDown } from 'lucide-react';
+import { X, AlertCircle, ChevronDown } from 'lucide-react';
 import ModalOverlay from '../ui/ModalOverlay';
+import Loader from '../ui/Loader';
 import { DetailModalHeader, DetailModalBody } from '../ui/DetailModal';
 
 type BaseFormProps = {
@@ -115,7 +116,7 @@ export default function BaseForm({
                 disabled={loading}
                 className="px-6 py-3 sm:py-2.5 min-h-[44px] text-[10px] font-normal uppercase tracking-wide text-white bg-blue-600 hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg"
               >
-                {loading && <Loader2 size={14} className="animate-spin" />}
+                {loading && <Loader size={14} />}
                 {loading ? 'Procesando...' : 'Guardar Cambios'}
               </button>
             </div>

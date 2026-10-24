@@ -9,6 +9,7 @@ import { useHeaderVisible } from '../../../shared/hooks/useHeaderVisible';
 import { supabase } from '../../../shared/services/supabase';
 import SparePartForm from '../forms/SparePartForm';
 import { useAuth } from '../../../app/providers/AuthContext';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import DetailModal, {
   DetailModalHeader,
   DetailModalBody,
@@ -420,10 +421,7 @@ export default function SpareParts() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-100 border-t-blue-600 mb-4"></div>
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Cargando catálogo...</p>
-          </div>
+          <LoadingSpinner label="Cargando catálogo..." />
         ) : filteredParts.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-slate-100 rounded-3xl p-20 text-center">
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">

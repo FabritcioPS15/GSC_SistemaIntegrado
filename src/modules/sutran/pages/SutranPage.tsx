@@ -8,6 +8,7 @@ import { useSupabaseQuery } from '../../../shared/hooks/useSupabaseQuery';
 import SutranVisitForm from '../forms/SutranVisitForm';
 import { useAuth } from '../../../app/providers/AuthContext';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import DetailModal, {
   DetailModalHeader,
@@ -15,11 +16,10 @@ import DetailModal, {
   StandardModalFooter,
 } from '../../../shared/components/ui/DetailModal';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCellPrimary, TableCellSecondary, TableActionButton } from '../../../shared/components/ui/Table';
 
 export default function Sutran() {
@@ -370,14 +370,6 @@ export default function Sutran() {
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
           {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
-
-          {canEdit() && (
             <button
               onClick={() => { setEditingVisit(undefined); setShowForm(true); }}
               className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-[#002855] text-white text-[10px] font-normal uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm"
@@ -387,7 +379,19 @@ export default function Sutran() {
             </button>
           )}
 
-          <ExportButtons onExportExcel={handleGenerateExcel} onExportPDF={handleGeneratePDF} />
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={handleGenerateExcel}
+            onExportPDF={handleGeneratePDF}
+          />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && (
             <button
@@ -410,9 +414,7 @@ export default function Sutran() {
 
         <div className="space-y-6 animate-in fade-in duration-500">
           {loading ? (
-            <div className="flex items-center justify-center min-h-[40vh]">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
-            </div>
+            <LoadingSpinner label="Cargando SUTRAN..." />
           ) : viewMode === 'table' ? (
             <div className="bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col rounded-none">
               <div className="bg-slate-50/50 border-b border-slate-100 relative z-20">

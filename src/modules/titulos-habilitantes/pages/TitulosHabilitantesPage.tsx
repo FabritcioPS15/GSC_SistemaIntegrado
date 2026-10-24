@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Plus, Trash2, MapPin, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import Pagination from '../../../shared/components/ui/Pagination';
 import { supabase, Location } from '../../../shared/services/supabase';
@@ -10,11 +10,10 @@ import { useAllowedLocations } from '../../../shared/hooks/useAllowedLocations';
 import TituloHabilitanteForm from '../forms/TituloHabilitanteForm';
 import TituloHabilitanteDetails from '../components/TituloHabilitanteDetails';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 import RowActions from '../../../shared/components/ui/RowActions';
@@ -425,20 +424,24 @@ export default function TitulosHabilitantes() {
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
           {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
-
-          {canEdit() && (
             <PrimaryButton icon={Plus} onClick={() => { setEditingTitulo(undefined); setIsFormOpen(true); }}>
               Nuevo Título
             </PrimaryButton>
           )}
 
-          <ExportButtons onExportExcel={downloadReport} onExportPDF={downloadReportPdf} />
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={downloadReport}
+            onExportPDF={downloadReportPdf}
+          />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && viewMode === 'table' && (
             <button
@@ -452,7 +455,7 @@ export default function TitulosHabilitantes() {
         </ActionToolbar>
 
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner label="Cargando títulos habilitantes..." />
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {paginatedData.map(titulo => (

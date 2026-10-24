@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Key, AlertCircle, CheckCircle, Loader2, User, Database } from 'lucide-react';
+import { Eye, EyeOff, Key, AlertCircle, CheckCircle, User, Database } from 'lucide-react';
 import { supabase } from '../../../shared/services/supabase';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
+import Loader from '../../../shared/components/ui/Loader';
 import Login from './Login';
 
 type User = {
@@ -122,10 +124,7 @@ export default function PasswordSetup() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800 mx-auto mb-4"></div>
-          <p className="text-slate-600">Cargando usuarios...</p>
-        </div>
+        <LoadingSpinner minHeight="100vh" label="Cargando usuarios..." />
       </div>
     );
   }
@@ -285,7 +284,7 @@ export default function PasswordSetup() {
                     >
                       {settingPassword === user.id ? (
                         <>
-                          <Loader2 className="animate-spin" size={16} />
+                          <Loader size={16} />
                           Configurando...
                         </>
                       ) : (

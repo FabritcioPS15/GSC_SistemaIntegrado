@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, History, ExternalLink, GraduationCap, Stethoscope, Car, MapPin, Building2, Trash2 } from 'lucide-react';
 import { supabase, Location } from '../../../shared/services/supabase';
 import { useNotify } from '../../../shared/hooks/useNotify';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 
 export default function ChecklistDetail() {
   const { type, id } = useParams<{ type: string; id: string }>();
@@ -86,9 +87,7 @@ export default function ChecklistDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
-      </div>
+      <LoadingSpinner label="Cargando checklist..." />
     );
   }
 

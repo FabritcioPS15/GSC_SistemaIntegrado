@@ -10,6 +10,7 @@ import { useAllowedLocations } from '../../../shared/hooks/useAllowedLocations';
 import { emailService } from '../../../shared/services/emailService';
 import { Request, RequestStatus, RequestPriority, RequestCategory } from '../../../shared/types/requests.types';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import {
@@ -457,10 +458,7 @@ export default function RequestsPage() {
 
         {/* Table */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center min-h-[50vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600"></div>
-            <p className="mt-4 text-gray-600">Cargando solicitudes...</p>
-          </div>
+          <LoadingSpinner label="Cargando solicitudes..." />
         ) : paginatedRequests.length === 0 ? (
           <div className="text-center py-12">
             <FileText size={48} className="mx-auto mb-4 text-[#002855] opacity-20" />
@@ -705,7 +703,7 @@ export default function RequestsPage() {
                       </span>
                     </DetailModalRow>
                     <DetailModalRow label="Prioridad">
-                      <span className={`inline-block px-2.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-[9px] font-normal tracking-widest border ${priorityColors[selectedRequest.priority]}`}>
+                      <span className="text-[10px] sm:text-[11px] font-normal text-slate-600 uppercase">
                         {priorityLabels[selectedRequest.priority]}
                       </span>
                     </DetailModalRow>

@@ -3,6 +3,7 @@ import { Eye, EyeOff, AlertCircle, User, Lock, ArrowRight, UserPlus } from 'luci
 import { supabase } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import BaseForm, { FormSection, FormField, FormInput, FormSelect, FormTextarea } from '../../../shared/components/forms/BaseForm';
+import Loader from '../../../shared/components/ui/Loader';
 
 export default function Login() {
   const mountedRef = useRef(true);
@@ -278,7 +279,7 @@ export default function Login() {
                 className="w-full bg-[#002855] text-white py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-sm hover:bg-[#003d80] active:scale-[0.98] transition-all disabled:opacity-50 disabled:active:scale-100 shadow-xl shadow-blue-900/10 flex items-center justify-center gap-3"
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <Loader size={20} color1="rgba(255,255,255,0.3)" color2="#ffffff" />
                 ) : (
                   <>
                     Ingresar Sistema

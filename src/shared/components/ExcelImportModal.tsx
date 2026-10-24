@@ -1,10 +1,11 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { X, FileSpreadsheet, AlertCircle, CheckCircle, Loader2, Upload } from 'lucide-react';
+import { X, FileSpreadsheet, AlertCircle, CheckCircle, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase, AssetType, Location, Category, Subcategory } from '../services/supabase';
 import { useNotify } from '../hooks/useNotify';
 import { generateAndDownloadTemplate } from '../utils/excelTemplate';
 import ModalOverlay from './ui/ModalOverlay';
+import Loader from './ui/Loader';
 
 type ExcelImportModalProps = {
     isOpen: boolean;
@@ -959,7 +960,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onClose, on
                             disabled={!file || !preview || preview.validRecords === 0 || importing}
                             className="px-8 py-2 text-[10px] font-normal uppercase tracking-[0.2em] text-white bg-blue-600 rounded-none hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg disabled:cursor-not-allowed"
                         >
-                            {importing && <Loader2 size={14} className="animate-spin" />}
+                            {importing && <Loader size={14} />}
                             {importing ? 'Importando...' : `Importar ${preview?.validRecords || 0} Registros`}
                         </button>
                     </div>

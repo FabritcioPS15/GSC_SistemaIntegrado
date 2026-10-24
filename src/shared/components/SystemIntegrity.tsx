@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, AlertTriangle, RefreshCw, Database, Users, Package, Camera, Wrench, Send, MapPin } from 'lucide-react';
 import { generateIntegrityReport, syncAllAssetsIntegrity, cleanupOrphanedData } from '../services/sync';
+import LoadingSpinner from './ui/LoadingSpinner';
 
 interface IntegrityReport {
   summary: {
@@ -106,9 +107,7 @@ export default function SystemIntegrity() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="text-left py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600"></div>
-        </div>
+        <LoadingSpinner minHeight="0" size={48} className="py-12" label="Cargando integridad del sistema..." />
       </div>
     );
   }

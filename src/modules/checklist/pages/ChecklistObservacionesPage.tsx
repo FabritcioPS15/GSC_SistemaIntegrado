@@ -4,7 +4,7 @@ import { supabase, ChecklistObservacion } from '../../../shared/services/supabas
 import { useAuth } from '../../../app/providers/AuthContext';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
 import FilterBar from '../../../shared/components/ui/FilterBar';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import Pagination from '../../../shared/components/ui/Pagination';
 import DateRangeFilter, { DateRange } from '../../../shared/components/ui/DateRangeFilter';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
@@ -540,7 +540,7 @@ export default function ChecklistObservaciones() {
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
-                   <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
+                   <ActionsDropdown onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
 
                    {puedeEditar && seleccionados.length > 0 && locations.length > 0 && (
                       <>

@@ -4,6 +4,7 @@ import { supabase } from '../../../shared/services/supabase';
 import { Category, Subcategory, CategoryFormData, SubcategoryFormData } from '../../../shared/types/inventory.types';
 import BaseForm, { FormSection, FormField, FormInput, FormTextarea } from '../../../shared/components/forms/BaseForm';
 import { useNotify } from '../../../shared/hooks/useNotify';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 
 interface CategoryManagerProps {
   onCategorySelect?: (categoryId: string) => void;
@@ -205,9 +206,7 @@ export default function CategoryManager({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-slate-200 border-t-slate-800"></div>
-      </div>
+      <LoadingSpinner minHeight="0" size={48} className="py-8" label="Cargando categorías..." />
     );
   }
 

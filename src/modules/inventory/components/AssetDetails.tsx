@@ -153,7 +153,7 @@ export default function AssetDetails({ asset, onClose, onEdit }: AssetDetailsPro
               <DetailModalCard className="space-y-2.5 sm:space-y-3">
                 <DetailModalRow label="Código Único">
                   <div className="flex items-center gap-1.5 justify-end">
-                    <span className="font-mono text-[10px] sm:text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 border border-blue-200">
+                    <span className="font-mono text-[10px] sm:text-xs font-bold text-slate-700">
                       {asset.codigo_unico || 'S/C'}
                     </span>
                     {asset.codigo_unico && (
@@ -373,7 +373,7 @@ export default function AssetDetails({ asset, onClose, onEdit }: AssetDetailsPro
                   <div className="relative z-10 space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-[8px] sm:text-[9px] font-normal tracking-wide text-blue-400 uppercase">Mantenimiento GS</span>
-                      <span className="text-[10px] font-bold bg-blue-600/30 text-blue-300 px-2 py-0.5 border border-blue-500/30">
+                      <span className="text-[10px] font-bold text-slate-300">
                         {maintenanceCount} REGISTRO{maintenanceCount > 1 ? 'S' : ''}
                       </span>
                     </div>

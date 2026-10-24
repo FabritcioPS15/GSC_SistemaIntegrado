@@ -15,6 +15,7 @@ import { supabase } from '../../../shared/services/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthContext';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import { format, formatDistanceToNow, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -461,12 +462,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando dashboard...</p>
-        </div>
-      </div>
+      <LoadingSpinner label="Cargando dashboard..." />
     );
   }
 
@@ -906,10 +902,13 @@ export default function Dashboard() {
 
               {/* Vehicle List — scrollable */}
               {loadingExpired && documentFilter === 'expired' ? (
-                <div className="text-center py-8">
-                  <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-none animate-spin mx-auto mb-4"></div>
-                  <p className="text-[10px] font-normal uppercase tracking-widest text-slate-500">Cargando vehículos vencidos...</p>
-                </div>
+                <LoadingSpinner
+                  className="py-8"
+                  minHeight="0"
+                  size={32}
+                  label="Cargando vehículos vencidos..."
+                  labelClassName="text-[10px] font-normal uppercase tracking-widest text-slate-500"
+                />
               ) : (
                 (() => {
                   const filteredVehicles = getFilteredVehicles(showDocumentPopup as 'soat' | 'citv' | 'poliza');

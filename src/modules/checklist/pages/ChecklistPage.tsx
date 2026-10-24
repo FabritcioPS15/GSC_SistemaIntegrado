@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthContext';
 import LocationForm from '../../sedes/forms/LocationForm';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
@@ -14,7 +14,7 @@ import DetailModal, {
    DetailModalBody,
 } from '../../../shared/components/ui/DetailModal';
 import Pagination from '../../../shared/components/ui/Pagination';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
+
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import { Building2 } from 'lucide-react';
@@ -266,7 +266,6 @@ export default function Checklist({ type }: { type?: string }) {
                      Abrir Drive
                   </a>
                )}
-
                {canEdit() && (
                   <button
                      onClick={() => {
@@ -288,15 +287,20 @@ export default function Checklist({ type }: { type?: string }) {
                    Comentarios
                 </button>
 
-                <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
+                <ActionsDropdown
+                   selectionMode={
+                      canEdit()
+                         ? {
+                              active: selectionMode,
+                              onToggle: handleToggleSelectionMode,
+                              selectedCount: selectedIds.length,
+                           }
+                         : undefined
+                   }
+                   onExportExcel={handleExportExcel}
+                   onExportPDF={handleExportPdf}
+                />
 
-               {canEdit() && (
-                  <SelectionModeButton
-                     active={selectionMode}
-                     onClick={handleToggleSelectionMode}
-                     selectedCount={selectedIds.length}
-                  />
-               )}
 
                <ViewToggle viewMode={viewMode} onChange={(m) => setViewMode(m as 'grid' | 'table')} />
             </ActionToolbar>

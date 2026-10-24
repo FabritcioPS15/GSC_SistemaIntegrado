@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, AlertTriangle, RefreshCw, Search } from 'lucide-react';
 import { supabase } from '../../../shared/services/supabase';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 
 interface FutureVisit {
   id: string;
@@ -230,9 +231,7 @@ export default function SutranFutureVisits() {
 
         {/* Table */}
         {loading ? (
-          <div className="flex items-center justify-center min-h-[40vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
-          </div>
+          <LoadingSpinner label="Cargando visitas futuras..." />
         ) : filteredVisits.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-none shadow-sm p-16 text-center">
             <div className="w-24 h-24 rounded-none bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center mx-auto mb-6">

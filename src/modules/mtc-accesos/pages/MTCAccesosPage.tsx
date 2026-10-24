@@ -6,17 +6,17 @@ import MTCAccesoForm from '../forms/MTCAccesoForm';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import DetailModal, {
   DetailModalHeader,
   DetailModalBody,
   StandardModalFooter,
 } from '../../../shared/components/ui/DetailModal';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterSelect from '../../../shared/components/ui/FilterSelect';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import {
   Table,
   TableHeader,
@@ -329,14 +329,6 @@ export default function MTCAccesos() {
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
           {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
-
-          {canEdit() && (
             <button
               onClick={() => setView(view === 'form' ? 'list' : 'form')}
               className={`w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 text-[10px] font-normal uppercase tracking-wider transition-all shadow-sm ${view === 'form' ? 'bg-slate-800 text-white' : 'bg-[#002855] text-white hover:bg-blue-800'}`}
@@ -346,7 +338,19 @@ export default function MTCAccesos() {
             </button>
           )}
 
-          <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
+          />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && viewMode === 'table' && (
             <button
@@ -378,9 +382,7 @@ export default function MTCAccesos() {
         ) : (
           <div className="space-y-6 animate-in fade-in duration-500">
             {loading ? (
-              <div className="flex items-center justify-center min-h-[40vh]">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
-              </div>
+              <LoadingSpinner label="Cargando accesos MTC..." />
             ) : viewMode === 'table' ? (
               <div className="bg-white border border-slate-200 rounded-none shadow-sm overflow-hidden flex flex-col">
                 <div className="bg-slate-50 border-b border-slate-200 relative z-20">

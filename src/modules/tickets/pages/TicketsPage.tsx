@@ -3,7 +3,7 @@
 // Incluye automatización de estados y exportación a PDF/Excel
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { History, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { History, CheckCircle2, Plus, Circle } from 'lucide-react';
 import { FaFilePdf } from "react-icons/fa6";
 import { RiFileExcel2Fill } from "react-icons/ri";
 import { supabase } from '../../../shared/services/supabase';
@@ -14,7 +14,10 @@ import TicketForm from '../forms/TicketForm';
 import SLATimer from '../components/SLATimer';
 import ComplexityBadge from '../components/ComplexityBadge';
 import { useTicketNotifications } from '../hooks/useTicketNotifications';
-import { Ticket, TicketStatus, TicketPriority, COMPLEXITY_CATEGORY, COMPLEXITY_LABELS, COMPLEXITY_LEVELS, TicketComplexity, normalizeComplexity } from '../tickets.types';import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
+import { TicketStatus, TicketPriority, COMPLEXITY_CATEGORY, COMPLEXITY_LABELS, COMPLEXITY_LEVELS, TicketComplexity, normalizeComplexity } from '../tickets.types';import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
+import SearchBar from '../../../shared/components/ui/SearchBar';
+import FilterBar from '../../../shared/components/ui/FilterBar';
+import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
 
 // =============================================================================
 // TicketsPage.tsx — Página principal del módulo Mesa de Ayuda
@@ -118,6 +121,7 @@ export default function Tickets() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false); // Controla visibilidad del modal de creación
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]); // Filtro por estado
     const [startDate, setStartDate] = useState(''); // Filtro de fecha inicio
     const [endDate, setEndDate] = useState(''); // Filtro de fecha fin
     // Filtro del reporte por nivel de complejidad: '' = todos, 'N1'|'N2'|'N3'|'__none__' (sin clasificar)
@@ -161,7 +165,7 @@ export default function Tickets() {
                     // For inserts, we fetch the single new ticket with its relations
                     const { data } = await supabase
                         .from('tickets')
-                        .select(`*, requester:requester_id(full_name, avatar_url), attendant:assigned_to(full_name, avatar_url), locations(name)`)
+                        .select(`*, requester:requester_id(full_name, avatar_url), attendant:assigned_to(full_name, avatar_url), locations(name), ticket_assignments(user_id)`)
                         .eq('id', (payload.new as any).id)
                         .single();
 
@@ -255,7 +259,8 @@ export default function Tickets() {
                     *,
                     requester:requester_id(full_name, avatar_url),
                     attendant:assigned_to(full_name, avatar_url),
-                    locations(name)
+                    locations(name),
+                    ticket_assignments(user_id)
                 `)
                 .order('created_at', { ascending: false });
             if (error) throw error;
@@ -406,13 +411,34 @@ export default function Tickets() {
             t.requester?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             t.locations?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-        // Dashboard: todos los tickets activos
-        const dashboardList = active.filter(searchMatch);
+        const statusMatch = (t: any) =>
+            selectedStatuses.length === 0 || selectedStatuses.includes(t.status);
 
-        // Mis Tickets: creados por mí
-        const myCreated = tickets.filter(t => t.requester_id === user?.id && searchMatch(t));
-        // Mis Tickets: atendidos por mí (assigned)
-        const myAttended = tickets.filter(t => t.assigned_to === user?.id && t.requester_id !== user?.id && searchMatch(t));
+        // Dashboard: todos los tickets activos
+        const dashboardList = active.filter(t => searchMatch(t) && statusMatch(t));
+
+        // Determinar si un ticket fue atendido por el usuario actual
+        // (ya sea como técnico principal assigned_to o colaborador en ticket_assignments)
+        const isAttendedByMe = (t: any) => {
+            if (!user?.id) return false;
+            if (t.assigned_to === user.id) return true;
+            if (Array.isArray(t.ticket_assignments)) {
+                return t.ticket_assignments.some(
+                    (a: any) => a.user_id === user.id && a.user_id !== t.requester_id
+                );
+            }
+            return false;
+        };
+
+        const isCreatedByMe = (t: any) => {
+            if (!user?.id) return false;
+            return t.requester_id === user.id;
+        };
+
+        // Mis Tickets: creados por mí (que tengan que ver con el usuario)
+        const myCreated = tickets.filter(t => isCreatedByMe(t) && searchMatch(t) && statusMatch(t));
+        // Mis Tickets: atendidos por mí (asignado directo o en equipo de atención)
+        const myAttended = tickets.filter(t => isAttendedByMe(t) && !isCreatedByMe(t) && searchMatch(t) && statusMatch(t));
 
         let archivedList = tickets.filter(t => t.status === 'archived' && searchMatch(t));
         if (startDate) {
@@ -431,12 +457,11 @@ export default function Tickets() {
             inProgress: dashboardList.filter(t => t.status === 'in_progress'),
             resolved: dashboardList.filter(t => t.status === 'resolved'),
             closed: dashboardList.filter(t => t.status === 'closed'),
-            recent: dashboardList.slice(0, 15),
             myCreated,
             myAttended,
             archivedList
         };
-    }, [tickets, searchTerm, activeTab, user?.id, startDate, endDate]);
+    }, [tickets, searchTerm, selectedStatuses, activeTab, user?.id, startDate, endDate]);
 
     // Calcula métricas del periodo seleccionado para el reporte
     // - Tasa de resolución: porcentaje de tickets resueltos/cerrados/archivados
@@ -888,7 +913,51 @@ export default function Tickets() {
                         </div>
                     ) : activeTab === 'my_tickets' ? (
                         // ===================== MIS TICKETS =====================
-                        <div className="w-full px-4 md:px-8 xl:px-12 py-8 space-y-8">
+                        <div className="w-full px-4 md:px-8 xl:px-12 py-8 space-y-6">
+
+                            {/* Barra de herramientas y filtros para Mis Tickets */}
+                            <ActionToolbar
+                                totalItems={filteredTickets.myCreated.length + filteredTickets.myAttended.length}
+                                label="Mis Tickets"
+                                searchComponent={
+                                    <SearchBar
+                                        placeholder="Buscar en mis tickets por incidente o sede..."
+                                        value={searchTerm}
+                                        onChange={setSearchTerm}
+                                    />
+                                }
+                            >
+                                <FilterBar
+                                    filters={[
+                                        {
+                                            key: 'status',
+                                            placeholder: 'TODOS LOS ESTADOS',
+                                            icon: Circle,
+                                            iconClassName: 'text-emerald-500',
+                                            wrapperClassName: 'md:min-w-[200px]',
+                                            multiple: true,
+                                            options: [
+                                                { value: 'open', label: 'Pendiente' },
+                                                { value: 'in_progress', label: 'En Proceso' },
+                                                { value: 'resolved', label: 'Resuelto' },
+                                                { value: 'closed', label: 'Cerrado' },
+                                            ],
+                                        },
+                                    ]}
+                                    values={{ status: selectedStatuses }}
+                                    onChange={(key, value) => {
+                                        if (key === 'status') setSelectedStatuses(value as string[]);
+                                    }}
+                                    onClearAll={() => setSelectedStatuses([])}
+                                />
+                                <button
+                                    onClick={() => setShowForm(true)}
+                                    className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-[#002855] text-white text-[10px] font-normal uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm"
+                                >
+                                    <Plus size={14} />
+                                    Nuevo Ticket
+                                </button>
+                            </ActionToolbar>
 
                             {/* Tabla: Mis solicitudes creadas */}
                             <div className="bg-white border border-slate-200 rounded-none shadow-sm flex flex-col p-4 relative pt-10">
@@ -1098,8 +1167,56 @@ export default function Tickets() {
                         </div>
                     ) : (
                         <>
+                            {/* Buscador y filtros del dashboard */}
+                            <div className="px-4 sm:px-8 pt-6">
+                                <div className="max-w-[1600px] mx-auto">
+                                    <ActionToolbar
+                                        totalItems={filteredTickets.pending.length + filteredTickets.inProgress.length + filteredTickets.resolved.length + filteredTickets.closed.length}
+                                        label="Tickets"
+                                        searchComponent={
+                                            <SearchBar
+                                                placeholder="Buscar ticket por incidente, solicitante o sede..."
+                                                value={searchTerm}
+                                                onChange={setSearchTerm}
+                                            />
+                                        }
+                                    >
+                                        <FilterBar
+                                            filters={[
+                                                {
+                                                    key: 'status',
+                                                    placeholder: 'TODOS LOS ESTADOS',
+                                                    icon: Circle,
+                                                    iconClassName: 'text-emerald-500',
+                                                    wrapperClassName: 'md:min-w-[200px]',
+                                                    multiple: true,
+                                                    options: [
+                                                        { value: 'open', label: 'Pendiente' },
+                                                        { value: 'in_progress', label: 'En Proceso' },
+                                                        { value: 'resolved', label: 'Resuelto' },
+                                                        { value: 'closed', label: 'Cerrado' },
+                                                    ],
+                                                },
+                                            ]}
+                                            values={{ status: selectedStatuses }}
+                                            onChange={(key, value) => {
+                                                if (key === 'status') setSelectedStatuses(value as string[]);
+                                            }}
+                                            onClearAll={() => setSelectedStatuses([])}
+                                        />
+                                        <button
+                                            onClick={() => setShowForm(true)}
+                                            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-[#002855] text-white text-[10px] font-normal uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm"
+                                        >
+                                            <Plus size={14} />
+                                            Nuevo Ticket
+                                        </button>
+                                    </ActionToolbar>
+                                </div>
+                            </div>
+
                             {/* Kanban Section */}
-                            <div className="p-4 sm:p-8 mt-6">
+                            <div className="p-4 sm:p-8 mt-2">
                                 <div className="flex overflow-x-auto pb-6 custom-scrollbar w-full max-w-[1600px] mx-auto">
 
                                     {/* Column: Pendiente */}
@@ -1410,114 +1527,6 @@ export default function Tickets() {
                                 </div>
                             </div>
 
-                            {/* Recent Content Table */}
-                            <div className="px-4 sm:px-8 pb-32 mt-10 max-w-[1800px] mx-auto w-full">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 px-4 gap-4">
-                                    <div>
-                                        <h2 className="text-lg sm:text-xl font-semibold text-[#002855]">Historial de tickets</h2>
-                                        <p className="text-[11px] font-semibold text-slate-400 tracking-wider mt-1">Reporte detallado de las últimas interacciones</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => navigate('/tickets/history')}
-                                            className="px-4 sm:px-6 py-2.5 bg-white border border-slate-200 rounded-xl text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-[#002855] hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
-                                        >
-                                            Historial de tickets
-                                            <ArrowRight size={14} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white border border-slate-200 rounded-none shadow-sm flex flex-col p-4 relative pt-10">
-                                    <div className="absolute -top-3 -left-3">
-                                        <div className="bg-[#002855] text-white px-3 py-1 text-[10px] font-semibold uppercase tracking-tight shadow-xl">
-                                            ÚLTIMAS INTERACCIONES ({filteredTickets.recent.length})
-                                        </div>
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        {/* Mobile cards */}
-                                        <div className="block md:hidden space-y-3">
-                                            {filteredTickets.recent.map(t => {
-                                                const prio = PRIORITY_STYLES[t.priority] || PRIORITY_STYLES.medium;
-                                                return (
-                                                    <div key={t.id} onClick={() => navigate(`/ticket/${t.id}`)} className="bg-white border border-slate-200 p-4 active:bg-slate-50 transition-all cursor-pointer">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <span className="text-[10px] font-semibold text-[#002855] uppercase">#TK-{t.id.slice(0, 6)}</span>
-                                                            <span className={`text-[14px] font-semibold ${prio.color}`}>
-                                                                {prio.label}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-[12px] font-semibold text-slate-700 uppercase leading-tight mb-2 line-clamp-2">{t.title}</p>
-                                                        <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-2">
-                                                            <span className="truncate">{t.locations?.name || 'Central'}</span>
-                                                            <span className="text-slate-300">•</span>
-                                                            <span>{new Date(String(t.created_at).includes('T') ? String(t.created_at) : `${t.created_at}T12:00:00`).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between">
-                                                            <span className={`text-[14px] font-semibold ${STATUS_STYLES[t.status] || 'bg-slate-100 text-slate-600'}`}>
-                                                                {t.status === 'open' ? 'Pendiente' : t.status === 'in_progress' ? 'En Proceso' : t.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
-                                                            </span>
-                                                            <span className="text-[10px] font-semibold text-slate-600 truncate max-w-[140px]">{t.requester?.full_name || 'N/A'}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        {/* Desktop table */}
-                                        <div className="hidden md:block overflow-x-auto">
-                                            <Table>
-                                                <TableHeader>
-                                                    <tr>
-                                                        <TableHead>ID Ticket</TableHead>
-                                                        <TableHead>Incidente</TableHead>
-                                                        <TableHead>Estado</TableHead>
-<TableHead>Solicitante</TableHead>
-                                                            <TableHead>Prioridad</TableHead>
-                                                            <TableHead>Complejidad</TableHead>
-                                                        </tr>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {filteredTickets.recent.map(t => {
-                                                        const prio = PRIORITY_STYLES[t.priority] || PRIORITY_STYLES.medium;
-                                                        return (
-                                                            <TableRow key={t.id} onClick={() => navigate(`/ticket/${t.id}`)} className="cursor-pointer">
-                                                                <TableCell>
-                                                                    <span className="text-[12px] font-semibold text-[#002855] group-hover/row:text-blue-600 transition-colors uppercase">#TK-{t.id.slice(0, 6)}</span>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-[13px] font-semibold text-slate-700 uppercase leading-tight line-clamp-1">{t.title}</span>
-                                                                        <span className="text-[11px] font-semibold text-slate-400 tracking-wider mt-1">{new Date(String(t.created_at).includes('T') ? String(t.created_at) : `${t.created_at}T12:00:00`).toLocaleDateString()}</span>
-                                                                    </div>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <span className={`text-[14px] font-semibold ${STATUS_STYLES[t.status] || 'bg-slate-100 text-slate-600'}`}>
-                                                                        {t.status === 'open' ? 'Pendiente' : t.status === 'in_progress' ? 'En Proceso' : t.status === 'resolved' ? 'Resuelto' : 'Cerrado'}
-                                                                    </span>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-widest">{t.requester?.full_name}</span>
-                                                                        <span className="text-[10px] font-semibold text-slate-700 leading-tight truncate">{t.locations?.name || 'Central'}</span>
-                                                                    </div>
-                                                                </TableCell>
-<TableCell>
-                                                                        <span className={`text-[14px] font-semibold ${prio.color}`}>
-                                                                            {prio.label}
-                                                                        </span>
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        <TicketComplexityBadge ticket={t} />
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                        );
-                                                    })}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </>
                     )}
                 </div>

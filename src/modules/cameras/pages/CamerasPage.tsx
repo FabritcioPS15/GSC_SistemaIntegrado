@@ -8,6 +8,7 @@ import CameraForm from '../forms/CameraForm';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import StoredDiskForm from '../forms/StoredDiskForm';
 import DetailModal, {
   DetailModalHeader,
@@ -20,11 +21,10 @@ import DetailModal, {
 } from '../../../shared/components/ui/DetailModal';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import {
   Table,
   TableHeader,
@@ -622,15 +622,19 @@ export default function Cameras({ subview }: CamerasProps) {
             </button>
           )}
 
-          <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
-
-          {canEdit() && subview !== 'cameras-disks' && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
+          <ActionsDropdown
+            selectionMode={
+              canEdit() && subview !== 'cameras-disks'
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
+          />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && viewMode === 'table' && !subview && (
             <button
@@ -645,9 +649,7 @@ export default function Cameras({ subview }: CamerasProps) {
 
         {
           loading ? (
-            <div className="flex items-center justify-center min-h-[50vh]">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600"></div>
-            </div>
+            <LoadingSpinner label="Cargando cámaras..." />
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {paginatedData.map((cam) => (
@@ -1266,7 +1268,7 @@ export default function Cameras({ subview }: CamerasProps) {
                   <DetailModalSection title="Accesos y Red">
                     <DetailModalCard>
                       <DetailModalRow label="Tipo de Conexión">
-                        <span className="inline-block px-2.5 py-0.5 sm:px-3 sm:py-1 bg-white border border-slate-200 text-[9px] sm:text-[10px] font-normal text-blue-600 uppercase tracking-tighter shadow-sm">
+                        <span className="text-[10px] sm:text-[12px] font-normal text-[#002855] uppercase">
                           {humanAccess(selectedCamera.access_type)}
                         </span>
                       </DetailModalRow>

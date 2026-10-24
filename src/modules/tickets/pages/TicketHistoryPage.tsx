@@ -13,6 +13,7 @@ import { ShieldCheck, Search, Calendar, RefreshCw, Ticket as TicketIcon, Clock, 
 import { FaFilePdf } from "react-icons/fa6";
 import { RiFileExcel2Fill } from "react-icons/ri";
 import FilterBar from '../../../shared/components/ui/FilterBar';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import { supabase } from '../../../shared/services/supabase';
 import ComplexityBadge from '../components/ComplexityBadge';
 import { COMPLEXITY_CATEGORY, COMPLEXITY_LABELS, COMPLEXITY_LEVELS, normalizeComplexity } from '../tickets.types';
@@ -285,12 +286,7 @@ export default function TicketHistory() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-[#002855] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-slate-500 font-medium">Cargando historial...</p>
-                </div>
-            </div>
+            <LoadingSpinner className="bg-[#f8f9fc]" label="Cargando historial..." />
         );
     }
 

@@ -9,8 +9,9 @@ import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import { useAllowedLocations } from '../../../shared/hooks/useAllowedLocations';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
@@ -672,31 +673,19 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
 
           <ViewToggle viewMode={viewMode} onChange={setViewMode} />
 
-          <button
-            onClick={handleExportExcel}
-            disabled={sortedRecords.length === 0}
-            className="group flex items-center justify-center w-10 h-10 bg-white text-slate-400 border border-slate-200 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50 transition-all shadow-sm disabled:opacity-50"
-            title="Exportar a Excel"
-          >
-            <RiFileExcel2Fill size={20} className="text-slate-400 group-hover:text-emerald-600 transition-colors" />
-          </button>
-
-          <button
-            onClick={handleExportPDF}
-            disabled={sortedRecords.length === 0}
-            className="group flex items-center justify-center w-10 h-10 bg-white text-slate-400 border border-slate-200 hover:text-rose-700 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm disabled:opacity-50"
-            title="Exportar a PDF"
-          >
-            <FaFilePdf size={20} className="text-slate-400 group-hover:text-rose-600 transition-colors" />
-          </button>
-
-          {canDeleteRecord && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
+          <ActionsDropdown
+            selectionMode={
+              canDeleteRecord
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={sortedRecords.length > 0 ? handleExportExcel : undefined}
+            onExportPDF={sortedRecords.length > 0 ? handleExportPDF : undefined}
+          />
 
           {hasPermission('maintenance-create') && (
             <button
@@ -729,10 +718,7 @@ export default function Maintenance({ categoryFilter }: MaintenanceProps) {
 
         {
           loading ? (
-            <div className="flex flex-col items-center justify-center min-h-[50vh]">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600"></div>
-              <p className="mt-4 text-gray-600">Cargando mantenimientos...</p>
-            </div>
+            <LoadingSpinner label="Cargando mantenimientos..." />
           ) : sortedRecords.length === 0 ? (
             <div className="text-center py-12">
               <Wrench size={48} className="mx-auto mb-4 text-[#002855] opacity-20" />

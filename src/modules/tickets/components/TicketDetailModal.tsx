@@ -10,13 +10,13 @@
 // =============================================================================
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, User, Clock, MessageSquare, Trash2, ShieldCheck, Image as ImageIcon, Loader2, Ticket, MessageCircle } from 'lucide-react';
+import { X, Send, User, Clock, MessageSquare, Trash2, ShieldCheck, Image as ImageIcon, Ticket, MessageCircle } from 'lucide-react';
 import { supabase } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
-import ComplexityBadge from './ComplexityBadge';
-import { COMPLEXITY_CATEGORY } from '../tickets.types';
+import Loader from '../../../shared/components/ui/Loader';
+import { COMPLEXITY_CATEGORY, COMPLEXITY_LABELS, normalizeComplexity } from '../tickets.types';
 
 // Props del componente modal
 // ticket: Datos del ticket a mostrar
@@ -325,13 +325,9 @@ export default function TicketDetailModal({ ticket: initialTicket, onClose, onUp
         }
     };
 
-    const getPriorityStyle = (priority: string) => {
-        switch (priority) {
-            case 'critical': return 'text-rose-600 bg-rose-50 border-rose-100';
-            case 'high': return 'text-orange-600 bg-orange-50 border-orange-100';
-            case 'medium': return 'text-blue-600 bg-blue-50 border-blue-100';
-            default: return 'text-slate-600 bg-slate-50 border-slate-100';
-        }
+    const getComplexityLabel = (level?: string | null) => {
+        const normalized = normalizeComplexity(level);
+        return normalized ? COMPLEXITY_LABELS[normalized] : 'Sin clasificar';
     };
 
     // Verifica si el usuario actual puede gestionar el estado del ticket
@@ -404,11 +400,13 @@ export default function TicketDetailModal({ ticket: initialTicket, onClose, onUp
                         <div className="flex items-center justify-between mb-6 sm:mb-8 md:mb-10">
                             <span className="text-[8px] sm:text-[9px] md:text-[10px] font-normal text-slate-300 uppercase tracking-[0.2em] sm:tracking-[0.25em] md:tracking-[0.3em]">#TK-{currentTicket.id.slice(0, 8)}</span>
                             <div className="flex items-center gap-2">
-                                <div className={`px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[7px] sm:text-[8px] md:text-[9px] font-normal uppercase tracking-[0.15em] sm:tracking-[0.2em] border ${getPriorityStyle(currentTicket.priority)}`}>
+                                <span className="text-[8px] sm:text-[9px] md:text-[10px] font-normal text-slate-500 uppercase tracking-[0.15em] sm:tracking-[0.2em]">
                                     {getPriorityLabel(currentTicket.priority)}
-                                </div>
+                                </span>
                                 {currentTicket.category === COMPLEXITY_CATEGORY && (
-                                    <ComplexityBadge level={currentTicket.complexity_level} variant="full" />
+                                    <span className="text-[8px] sm:text-[9px] md:text-[10px] font-normal text-slate-400 uppercase tracking-[0.15em] sm:tracking-[0.2em]">
+                                        {getComplexityLabel(currentTicket.complexity_level)}
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -623,7 +621,7 @@ export default function TicketDetailModal({ ticket: initialTicket, onClose, onUp
                                     className="p-2 sm:p-3 text-[#002855] bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-xl transition-all shadow-sm"
                                     title="Subir imagen"
                                 >
-                                    {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
+                                    {uploadingImage ? <Loader size={20} /> : <ImageIcon className="w-5 h-5" />}
                                 </button>
                                 <div className="flex-1 relative group">
                                     <input

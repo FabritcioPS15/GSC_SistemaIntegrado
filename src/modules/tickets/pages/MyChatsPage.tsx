@@ -14,6 +14,7 @@ import { supabase } from '../../../shared/services/supabase';
 import { MessageSquare } from 'lucide-react';
 import TicketDetailModal from '../components/TicketDetailModal';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 
 // Mapa de estilos visuales para las prioridades en badges
 const PRIORITY_STYLES: Record<string, { label: string, color: string, dot: string }> = {
@@ -128,9 +129,7 @@ export default function MyChats() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
+            <LoadingSpinner label="Cargando chats..." />
         );
     }
 

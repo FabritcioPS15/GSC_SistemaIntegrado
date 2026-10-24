@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Package, Building2, MapPin, Wrench, TrendingUp, AlertTriangle,
   CheckCircle, DollarSign, BarChart3, PieChart, Filter, RefreshCw,
-  Activity, Percent, Layers
+  Activity, Percent, Layers, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { supabase, AssetWithDetails } from '../../../shared/services/supabase';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../../../shared/types/inventory.types';
 import AssetDetails from './AssetDetails';
 import FilterBar from '../../../shared/components/ui/FilterBar';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 
 // Estado de uso constants
 const ESTADO_USO_LABELS: Record<string, string> = {
@@ -67,6 +68,7 @@ export default function InventoryDashboard({ companyId, locationId }: InventoryD
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<AssetWithDetails | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(true);
 
   const [filterCompany, setFilterCompany] = useState<string>(companyId || '');
   const [filterLocation, setFilterLocation] = useState<string>(locationId || '');
@@ -199,13 +201,7 @@ export default function InventoryDashboard({ companyId, locationId }: InventoryD
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-16 gap-4">
-        <div className="relative w-16 h-16">
-          <div className="absolute inset-0 rounded-full border-4 border-slate-200" />
-          <div className="absolute inset-0 rounded-full border-4 border-[#002855] border-t-transparent animate-spin" />
-        </div>
-        <p className="text-slate-400 text-sm font-semibold animate-pulse">Cargando dashboard...</p>
-      </div>
+      <LoadingSpinner label="Cargando dashboard..." />
     );
   }
 
@@ -224,21 +220,18 @@ export default function InventoryDashboard({ companyId, locationId }: InventoryD
 
   if (!metrics || !rawData) return null;
 
-  const StatCard = ({ title, value, icon: Icon, gradient, sub, highlight = false }: {
-    title: string; value: string | number; icon: any; gradient: string; sub?: string; highlight?: boolean;
+  const SummaryMetric = ({ title, value, icon: Icon, sub, iconClassName = 'text-[#002855]', iconBg = 'bg-slate-100', valueClassName = 'text-slate-800', className = 'bg-white' }: {
+    title: string; value: string | number; icon: any; sub?: string; iconClassName?: string; iconBg?: string; valueClassName?: string; className?: string;
   }) => (
-    <div className={`relative overflow-hidden rounded-2xl p-5 shadow-sm border transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${highlight ? 'border-emerald-500/30 bg-gradient-to-br ' + gradient : 'bg-white border-slate-200/80'}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 truncate ${highlight ? 'text-emerald-100' : 'text-slate-400'}`}>{title}</p>
-          <p className={`text-2xl font-bold tabular-nums leading-tight ${highlight ? 'text-white' : 'text-slate-800'}`}>{value}</p>
-          {sub && <p className={`text-[10px] font-semibold mt-2 ${highlight ? 'text-emerald-100' : 'text-slate-400'}`}>{sub}</p>}
-        </div>
-        <div className={`p-3 rounded-xl shrink-0 ${highlight ? 'bg-white/20' : 'bg-gradient-to-br ' + gradient}`}>
-          <Icon size={20} className="text-white" />
-        </div>
+    <div className={`flex items-start gap-3 p-4 sm:p-5 min-w-0 ${className}`}>
+      <div className={`p-2 sm:p-2.5 rounded-lg shrink-0 ${iconBg} ${iconClassName}`}>
+        <Icon size={16} />
       </div>
-      <div className={`absolute -bottom-4 -right-4 w-20 h-20 rounded-full opacity-10 ${highlight ? 'bg-white' : 'bg-gradient-to-br ' + gradient}`} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">{title}</p>
+        <p className={`text-lg sm:text-xl font-bold tabular-nums leading-tight mt-0.5 truncate ${valueClassName}`}>{value}</p>
+        {sub && <p className="text-[9px] sm:text-[10px] font-semibold text-slate-400 mt-1 truncate">{sub}</p>}
+      </div>
     </div>
   );
 
@@ -425,20 +418,43 @@ export default function InventoryDashboard({ companyId, locationId }: InventoryD
         </div>
       </div>
 
-      {/* KPI Cards fila 1 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Activos" value={metrics.total} icon={Package} gradient="from-[#002855] to-[#001d40]" sub={`${rawData.companies.length} empresa(s)`} />
-        <StatCard title="Costo Total" value={`S/ ${metrics.totalValue.toLocaleString()}`} icon={DollarSign} gradient="from-emerald-700 to-emerald-800" sub="Suma del costo por activo" highlight />
-        <StatCard title="Operativos" value={`${metrics.pctOperativos}%`} icon={Percent} gradient="from-[#002855] to-blue-700" sub={`${metrics.operativos} de ${metrics.total}`} />
-        <StatCard title="En Reparacion" value={metrics.enReparacion} icon={AlertTriangle} gradient={metrics.enReparacion > 0 ? 'from-amber-500 to-orange-600' : 'from-slate-600 to-slate-700'} sub={metrics.enReparacion > 0 ? 'Requieren atencion' : 'Sin alertas'} />
-      </div>
+      {/* Resumen general consolidado */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-slate-200">
+          <div className="flex items-center gap-2.5">
+            <BarChart3 size={18} className="text-[#002855]" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Resumen General</h3>
+              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Indicadores consolidados del inventario</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSummaryOpen(prev => !prev)}
+            aria-expanded={summaryOpen}
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-slate-200 text-[10px] font-bold uppercase tracking-widest text-[#002855] hover:bg-slate-50 transition-colors"
+          >
+            {summaryOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {summaryOpen ? 'Ocultar detalle' : 'Mostrar detalle'}
+          </button>
+        </div>
 
-      {/* KPI Cards fila 2 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Sedes" value={rawData.locations.length} icon={MapPin} gradient="from-cyan-700 to-[#002855]" />
-        <StatCard title="Empresas" value={rawData.companies.length} icon={Building2} gradient="from-[#002855] to-indigo-900" />
-        <StatCard title="Costo Mantenimiento" value={`S/ ${metrics.totalMaintenanceCost.toLocaleString()}`} icon={Wrench} gradient="from-rose-600 to-rose-700" />
-        <StatCard title="Promedio por Activo" value={`S/ ${Math.round(metrics.avgValue).toLocaleString()}`} icon={TrendingUp} gradient="from-[#002855] to-teal-800" sub="Costo promedio por activo" />
+        {summaryOpen && (
+          <div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-slate-100">
+              <SummaryMetric title="Total Activos" value={metrics.total} icon={Package} sub={`${rawData.companies.length} empresa(s)`} iconClassName="text-[#002855]" iconBg="bg-blue-50" />
+              <SummaryMetric title="Costo Total" value={`S/ ${metrics.totalValue.toLocaleString()}`} icon={DollarSign} sub="Suma del costo por activo" iconClassName="text-emerald-700" iconBg="bg-emerald-50" valueClassName="text-emerald-700" />
+              <SummaryMetric title="Operativos" value={`${metrics.pctOperativos}%`} icon={Percent} sub={`${metrics.operativos} de ${metrics.total}`} iconClassName="text-blue-700" iconBg="bg-blue-50" />
+              <SummaryMetric title="En Reparación" value={metrics.enReparacion} icon={AlertTriangle} sub={metrics.enReparacion > 0 ? 'Requieren atención' : 'Sin alertas'} iconClassName={metrics.enReparacion > 0 ? 'text-amber-600' : 'text-slate-500'} iconBg={metrics.enReparacion > 0 ? 'bg-amber-50' : 'bg-slate-100'} valueClassName={metrics.enReparacion > 0 ? 'text-amber-600' : 'text-slate-800'} />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-slate-100 border-t border-slate-200">
+              <SummaryMetric title="Sedes" value={rawData.locations.length} icon={MapPin} iconClassName="text-rose-600" iconBg="bg-rose-50" className="bg-slate-50/60" />
+              <SummaryMetric title="Empresas" value={rawData.companies.length} icon={Building2} iconClassName="text-indigo-600" iconBg="bg-indigo-50" className="bg-slate-50/60" />
+              <SummaryMetric title="Costo Mantenimiento" value={`S/ ${metrics.totalMaintenanceCost.toLocaleString()}`} icon={Wrench} iconClassName="text-rose-600" iconBg="bg-rose-50" className="bg-slate-50/60" />
+              <SummaryMetric title="Promedio por Activo" value={`S/ ${Math.round(metrics.avgValue).toLocaleString()}`} icon={TrendingUp} sub="Costo promedio por activo" iconClassName="text-teal-700" iconBg="bg-teal-50" className="bg-slate-50/60" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Donut + Categorias */}

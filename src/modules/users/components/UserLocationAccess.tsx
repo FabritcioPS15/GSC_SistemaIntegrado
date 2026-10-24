@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Plus, X, Check, Loader2, Shield } from 'lucide-react';
+import { MapPin, Plus, X, Check, Shield } from 'lucide-react';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import { supabase, Location } from '../../../shared/services/supabase';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
@@ -117,9 +118,7 @@ export default function UserLocationAccess({ userId, userName, isOpen, onClose }
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="animate-spin text-blue-600" size={32} />
-            </div>
+            <LoadingSpinner minHeight="0" size={40} className="py-8" label="Cargando sedes..." />
           ) : (
             <div className="space-y-1">
               <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-3 ml-1">

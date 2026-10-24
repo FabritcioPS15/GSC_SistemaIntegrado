@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Edit, List, ClipboardCheck, LayoutGrid, X, User, Calendar, Plus, MapPin } from 'lucide-react';
 import { useHeaderVisible } from '../../../shared/hooks/useHeaderVisible';
 import { supabase, BranchAudit } from '../../../shared/services/supabase';
@@ -6,7 +6,8 @@ import { useAuth } from '../../../app/providers/AuthContext';
 import AuditForm from '../forms/AuditForm';
 import HeaderSearch from '../../../app/layouts/HeaderSearch';
 import FilterBar from '../../../shared/components/ui/FilterBar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../../shared/components/ui/Table';
@@ -151,13 +152,17 @@ export default function Audit() {
             </button>
           </div>
 
-          {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+          />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && view === 'history' && (
             <button
@@ -205,10 +210,7 @@ export default function Audit() {
         ) : (
           <div className="space-y-8 animate-in fade-in duration-500">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-32">
-                <div className="w-12 h-12 border-4 border-slate-100 border-t-[#002855] animate-spin mb-4"></div>
-                <p className="text-[12px] font-black text-[#002855] tracking-[0.2em]">Sincronizando Archivos...</p>
-              </div>
+              <LoadingSpinner label="Cargando auditorías..." />
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {filteredAudits.map(audit => {

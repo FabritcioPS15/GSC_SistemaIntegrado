@@ -19,11 +19,10 @@ import DetailModal, {
 } from '../../../shared/components/ui/DetailModal';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 import RowActions from '../../../shared/components/ui/RowActions';
@@ -393,25 +392,29 @@ export default function Servers() {
           <ViewToggle viewMode={viewMode} onChange={v => setViewMode(v)} />
 
           {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
-
-          {canEdit() && (
             <PrimaryButton onClick={openCreate}>
               Nuevo Servidor
             </PrimaryButton>
           )}
 
-          <ExportButtons onExportExcel={downloadServersReport} onExportPDF={downloadServersReportPdf} />
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={downloadServersReport}
+            onExportPDF={downloadServersReportPdf}
+          />
         </ActionToolbar>
 
         {/* Contenido principal */}
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner label="Cargando servidores..." />
         ) : viewMode === 'grid' ? (
 
           /* ── VISTA GRID ── */

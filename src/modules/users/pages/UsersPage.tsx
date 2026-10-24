@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Mail, MapPin, X, Users as UsersIcon, Shield, Crown, Lock, Settings, TrendingUp, User as UserIcon, Search, Scale, Filter } from 'lucide-react';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import FilterBar from '../../../shared/components/ui/FilterBar';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 import { generateExcel, generatePDF } from '../../../shared/utils/exportUtils';
@@ -13,14 +12,12 @@ import { BUSINESS_TYPE_LABELS } from '../../../shared/types/inventory.types';
 import UserForm from '../forms/UserForm';
 import { useAuth } from '../../../app/providers/AuthContext';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import DetailModal, {
   DetailModalHeader,
   DetailModalBody,
   StandardModalFooter,
-  DetailModalGrid,
-  DetailModalSection,
-  DetailModalCard,
-  DetailModalRow,
+
 } from '../../../shared/components/ui/DetailModal';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import UserLocationAccess from '../components/UserLocationAccess';
@@ -43,6 +40,7 @@ type User = {
     id: string;
     name: string;
     type: string;
+    business_type?: string;
   };
 };
 
@@ -184,8 +182,6 @@ export default function Users() {
       console.error('Error al cargar usuarios:', err);
     }
   };
-
-
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -343,7 +339,7 @@ export default function Users() {
       const result = aValue < bValue ? -1 : 1;
       return sortConfig.direction === 'asc' ? result : -result;
     });
-  }, [users, searchTerm, roleFilter, statusFilter, selectedLocations, sortConfig]);
+  }, [users, searchTerm, roleFilter, statusFilter, selectedRubros, selectedLocations, sortConfig]);
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -528,14 +524,6 @@ export default function Users() {
           <ViewToggle viewMode={viewMode} onChange={v => setViewMode(v as 'grid' | 'table')} />
 
           {canEditValue && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.length}
-            />
-          )}
-
-          {canEditValue && (
             <div className="flex gap-2">
               {selectionMode && selectedIds.length > 0 && (
                 <button
@@ -554,14 +542,24 @@ export default function Users() {
             </div>
           )}
 
-          <ExportButtons onExportExcel={exportToExcel} onExportPDF={exportToPdf} />
+          <ActionsDropdown
+            selectionMode={
+              canEditValue
+                ? {
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
+                : undefined
+            }
+            onExportExcel={exportToExcel}
+            onExportPDF={exportToPdf}
+          />
         </ActionToolbar>
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center min-h-[40vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-[#002855]"></div>
-          </div>
+          <LoadingSpinner label="Cargando usuarios..." />
         ) : viewMode === 'grid' ? (
           <div className="space-y-4">
             <div className="bg-white border border-slate-200 rounded-none shadow-sm overflow-hidden mb-4">
@@ -834,7 +832,7 @@ export default function Users() {
             <div className="space-y-4">
               {/* Rol y Estado */}
               <div className="flex items-center gap-2 flex-wrap pb-2 border-b border-slate-100">
-                <span className={`text-[14px] font-semibold ${getRoleColor(selectedUser.role)}`}>
+                <span className="text-[11px] font-medium text-slate-600 flex items-center gap-1.5">
                   {getRoleIcon(selectedUser.role)} {getRoleLabel(selectedUser.role)}
                 </span>
                 <span className="text-slate-300">•</span>

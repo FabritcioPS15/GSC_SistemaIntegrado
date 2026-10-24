@@ -4,15 +4,14 @@ import { supabase, Company } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import CompanyForm from '../forms/CompanyForm';
 import { useNotify } from '../../../shared/hooks/useNotify';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import { generateExcel, generatePDF } from '../../../shared/utils/exportUtils';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import {
   ActionToolbar,
+  ActionsDropdown,
   LoadingSpinner,
   PrimaryButton,
-  ExportButtons,
   Pagination,
   Table,
   TableHeader,
@@ -212,24 +211,28 @@ export default function Companies() {
           >
 
             {canEdit() && (
-              <SelectionModeButton
-                active={selectionMode}
-                onClick={handleToggleSelectionMode}
-                selectedCount={selectedIds.length}
-              />
-            )}
-
-            {canEdit() && (
               <PrimaryButton icon={Plus} onClick={openCreate}>
                 Nueva Unidad
               </PrimaryButton>
             )}
 
-            <ExportButtons onExportExcel={exportToExcel} onExportPDF={exportToPdf} />
+            <ActionsDropdown
+              selectionMode={
+                canEdit()
+                  ? {
+                      active: selectionMode,
+                      onToggle: handleToggleSelectionMode,
+                      selectedCount: selectedIds.length,
+                    }
+                  : undefined
+              }
+              onExportExcel={exportToExcel}
+              onExportPDF={exportToPdf}
+            />
           </ActionToolbar>
 
           {loading ? (
-            <LoadingSpinner />
+            <LoadingSpinner label="Cargando empresas..." />
           ) : (
             <div className="bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col rounded-none">
               <div className="bg-slate-50/50 border-b border-slate-100 relative z-20">

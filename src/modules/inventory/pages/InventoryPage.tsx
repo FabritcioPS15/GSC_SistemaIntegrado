@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Edit, Trash2, MapPin, Upload, Package, Layers, LayoutGrid, List, BarChart3, FileSpreadsheet, Circle, Plus, Filter } from 'lucide-react';
+import { Edit, Trash2, MapPin, Package, Layers, LayoutGrid, List, BarChart3, Circle, Plus, Filter } from 'lucide-react';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import { supabase, AssetWithDetails } from '../../../shared/services/supabase';
 import { generateExcel, generatePDF } from '../../../shared/utils/exportUtils';
@@ -9,8 +9,8 @@ import DecoupleModal from '../components/DecoupleModal';
 import ExcelImportModal from '../../../shared/components/ExcelImportModal';
 import { generateAndDownloadTemplate } from '../../../shared/utils/excelTemplate';
 import Pagination from '../../../shared/components/ui/Pagination';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import { useAuth } from '../../../app/providers/AuthContext';
-import SelectionModeButton from '../../../shared/components/ui/SelectionModeButton';
 import { useSelectionMode } from '../../../shared/hooks/useSelectionMode';
 import SearchBar from '../../../shared/components/ui/SearchBar';
 import { useInventory } from '../hooks/useInventory';
@@ -20,7 +20,7 @@ import InventoryDashboard from '../components/InventoryDashboard';
 import { InventoryFilter, BUSINESS_TYPE_LABELS } from '../../../shared/types/inventory.types';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
 import FilterBar from '../../../shared/components/ui/FilterBar';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import {
   Table,
   TableHeader,
@@ -408,11 +408,11 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
                 }))
               },
               {
-                key: 'status', placeholder: 'Todos los estados', icon: Circle, iconClassName: 'text-emerald-500', wrapperClassName: 'md:min-w-[170px]', options: [
-                  { value: 'Operativo', label: 'Operativo' },
-                  { value: 'Inoperativo', label: 'Inoperativo' },
-                  { value: 'En Reparación', label: 'En Reparación' },
-                  { value: 'Baja', label: 'De Baja' },
+                key: 'status', placeholder: 'TODOS LOS ESTADOS', icon: Circle, iconClassName: 'text-emerald-500', wrapperClassName: 'md:min-w-[170px]', options: [
+                  { value: 'Operativo', label: 'OPERATIVO' },
+                  { value: 'Inoperativo', label: 'INOPERATIVO' },
+                  { value: 'En Reparación', label: 'EN REPARACIÓN' },
+                  { value: 'Baja', label: 'DE BAJA' },
                 ]
               },
             ]}
@@ -452,14 +452,6 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
             </button>
           )}
 
-          {canEdit() && (
-            <SelectionModeButton
-              active={selectionMode}
-              onClick={handleToggleSelectionMode}
-              selectedCount={selectedIds.size}
-            />
-          )}
-
           <div className="flex bg-slate-100 p-1 border border-slate-200 w-full md:w-auto justify-center">
             <button
               onClick={() => {
@@ -490,31 +482,31 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
             </button>
           </div>
 
-          <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPdf} />
-          {canEdit() && (
-            <>
-              <button
-                onClick={async () => {
+          <ActionsDropdown
+            selectionMode={
+              canEdit()
+                ? {
+                  active: selectionMode,
+                  onToggle: handleToggleSelectionMode,
+                  selectedCount: selectedIds.size,
+                }
+                : undefined
+            }
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPdf}
+            onDownloadTemplate={
+              canEdit()
+                ? async () => {
                   try {
                     await generateAndDownloadTemplate();
                   } catch (err) {
                     notifyError('Error al descargar plantilla');
                   }
-                }}
-                className="flex-1 md:flex-none group flex items-center justify-center h-10 px-4 bg-white text-slate-400 border border-slate-200 hover:text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50 transition-all shadow-sm"
-                title="Descargar Plantilla"
-              >
-                <FileSpreadsheet size={20} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
-              </button>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex-1 md:flex-none group flex items-center justify-center h-10 px-4 bg-white text-slate-400 border border-slate-200 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50 transition-all shadow-sm"
-                title="Importar Excel"
-              >
-                <Upload size={20} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-              </button>
-            </>
-          )}
+                }
+                : undefined
+            }
+            onImportExcel={canEdit() ? () => setShowUploadModal(true) : undefined}
+          />
         </ActionToolbar>
 
         {/* Dashboard View */}
@@ -524,9 +516,7 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
             locationId={multiEnterpriseFilters.location_id}
           />
         ) : loading ? (
-          <div className="flex items-center justify-center min-h-[40vh]">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
-          </div>
+          <LoadingSpinner label="Cargando inventario..." />
         ) : viewMode === 'table' ? (
           <>
             <div className="md:hidden space-y-4 animate-in fade-in duration-300">
@@ -717,7 +707,7 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
                           <TableCell>
                             <div className="flex flex-col min-w-0">
                               <TableCellPrimary className="truncate max-w-[180px]">{asset.locations?.name || 'No asignada'}</TableCellPrimary>
-                               <TableCellSecondary className="truncate max-w-[180px] mt-1">{asset.areas?.name || (asset as any).area_ubicacion || 'Otros'}</TableCellSecondary>
+                              <TableCellSecondary className="truncate max-w-[180px] mt-1">{asset.areas?.name || (asset as any).area_ubicacion || 'Otros'}</TableCellSecondary>
                             </div>
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
@@ -733,10 +723,10 @@ export default function Inventory({ categoryFilter, subcategoryFilter }: Invento
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
                             <TableCellSecondary>
-                            <span className={getStatusColorClass(asset.estado_uso)}>
-                              {asset.estado_uso || 'Sin estado'}
-                            </span>
-                          </TableCellSecondary>
+                              <span className={getStatusColorClass(asset.estado_uso)}>
+                                {asset.estado_uso || 'Sin estado'}
+                              </span>
+                            </TableCellSecondary>
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>

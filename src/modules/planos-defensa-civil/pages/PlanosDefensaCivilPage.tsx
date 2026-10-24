@@ -9,7 +9,7 @@ import { useAuth } from '../../../app/providers/AuthContext';
 import ActionToolbar from '../../../shared/components/ui/ActionToolbar';
 import FilterBar from '../../../shared/components/ui/FilterBar';
 import ViewToggle from '../../../shared/components/ui/ViewToggle';
-import ExportButtons from '../../../shared/components/ui/ExportButtons';
+import ActionsDropdown from '../../../shared/components/ui/ActionsDropdown';
 import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import PrimaryButton from '../../../shared/components/ui/PrimaryButton';
 import RowActions from '../../../shared/components/ui/RowActions';
@@ -263,11 +263,11 @@ export default function PlanosDefensaCivil() {
             </PrimaryButton>
           )}
 
-          <ExportButtons onExportExcel={downloadReport} onExportPDF={downloadReportPdf} />
+          <ActionsDropdown onExportExcel={downloadReport} onExportPDF={downloadReportPdf} />
         </ActionToolbar>
 
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner label="Cargando planos..." />
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {paginatedData.map(plano => (

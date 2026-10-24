@@ -1,9 +1,10 @@
 import { useState, useRef, useMemo } from 'react';
-import { X, FileSpreadsheet, AlertCircle, CheckCircle, Loader2, Truck } from 'lucide-react';
+import { X, FileSpreadsheet, AlertCircle, CheckCircle, Truck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../../shared/services/supabase';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import ModalOverlay from '../../../shared/components/ui/ModalOverlay';
+import Loader from '../../../shared/components/ui/Loader';
 
 type VehicleImportModalProps = {
     isOpen: boolean;
@@ -483,7 +484,7 @@ export default function VehicleImportModal({ isOpen, onClose, onSuccess, locatio
                             disabled={!file || !preview || preview.validRecords === 0 || importing}
                             className="px-8 py-2 text-[10px] font-normal tracking-[0.2em] text-white bg-blue-600 rounded-none hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg disabled:cursor-not-allowed"
                         >
-                            {importing && <Loader2 size={14} className="animate-spin" />}
+                            {importing && <Loader size={14} />}
                             {importing ? 'Importando...' : `Importar ${preview?.validRecords || 0} Vehículos`}
                         </button>
                     </div>

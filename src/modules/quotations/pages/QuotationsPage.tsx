@@ -11,6 +11,7 @@ import { useNotify } from '../../../shared/hooks/useNotify';
 import { emailService } from '../../../shared/services/emailService';
 import QuotationForm from '../forms/QuotationForm';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
   TableCellPrimary, TableCellSecondary, TableActionButton
@@ -219,10 +220,7 @@ export default function QuotationsPage() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-100 border-t-blue-600 mb-4" />
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Cargando cotizaciones...</p>
-          </div>
+          <LoadingSpinner label="Cargando cotizaciones..." />
         ) : filtered.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-slate-100 p-20 text-center">
             <div className="w-20 h-20 bg-slate-50 flex items-center justify-center mx-auto mb-6">

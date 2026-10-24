@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, User, AlertCircle, MessageSquare, Copy, ArrowLeft, Lock, Smile, Bold, Italic, List, Image as ImageIcon, Loader2, Clock, Activity, CheckCircle2, XCircle, Underline, Strikethrough, Monitor, Eye, Briefcase, Terminal, Layers, ChevronDown } from 'lucide-react';
+import { Send, User, AlertCircle, MessageSquare, Copy, ArrowLeft, Lock, Smile, Bold, Italic, List, Image as ImageIcon, Clock, Activity, CheckCircle2, XCircle, Underline, Strikethrough, Monitor, Eye, Briefcase, Terminal, Layers, ChevronDown } from 'lucide-react';
 import { supabase } from '../../../shared/services/supabase';
 import { useAuth } from '../../../app/providers/AuthContext';
 import { FaWhatsapp, FaTrashAlt } from "react-icons/fa";
@@ -23,6 +23,8 @@ import { useTicketComments } from '../hooks/useTicketComments';
 import { useTicketRealtime } from '../hooks/useTicketRealtime';
 import { useNotify } from '../../../shared/hooks/useNotify';
 import QuickResponses from '../components/QuickResponses';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
+import Loader from '../../../shared/components/ui/Loader';
 import ComplexityBadge from '../components/ComplexityBadge';
 import {
     COMPLEXITY_CASES,
@@ -860,9 +862,7 @@ export default function TicketDetail() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
+            <LoadingSpinner label="Cargando ticket..." />
         );
     }
 
@@ -1341,7 +1341,7 @@ export default function TicketDetail() {
                                             className="h-9 px-3 flex items-center gap-2 text-slate-400 hover:bg-slate-100 hover:text-[#002855] border border-transparent hover:border-slate-200 transition-all"
                                             title="Adjuntar Imagen"
                                         >
-                                            {uploadingImage ? <Loader2 size={16} className="animate-spin text-[#002855]" /> : <ImageIcon size={16} />}
+                                            {uploadingImage ? <Loader size={16} /> : <ImageIcon size={16} />}
                                             <span className="text-[10px] font-semibold uppercase tracking-widest hidden sm:inline">Imagen</span>
                                         </button>
 
@@ -1434,7 +1434,7 @@ export default function TicketDetail() {
                                         className="w-14 h-14 bg-[#002855] text-white border-2 border-[#002855] flex items-center justify-center hover:bg-white hover:text-[#002855] transition-all active:scale-90 shadow-xl disabled:opacity-50 disabled:grayscale shrink-0"
                                         title="Enviar Mensaje"
                                     >
-                                        {sending ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
+                                        {sending ? <Loader size={24} /> : <Send size={24} />}
                                     </button>
                                 </form>
                             </div>

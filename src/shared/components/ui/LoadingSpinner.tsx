@@ -1,29 +1,42 @@
+import Loader from './Loader';
+
 interface LoadingSpinnerProps {
-  /** Altura mínima del contenedor. Default: '40vh' */
+  /** Altura mínima del contenedor. Default: '60vh' */
   minHeight?: string;
-  /** Tamaño del spinner en px. Default: 48 */
+  /** Tamaño del spinner en px. Default: 64 */
   size?: number;
   /** Clases adicionales para el contenedor */
   className?: string;
+  /** Color del anillo exterior. Default: #fff */
+  color1?: string;
+  /** Color del anillo interior. Default: #ff3d00 */
+  color2?: string;
+  /** Texto opcional debajo del loader */
+  label?: string;
+  /** Clases adicionales para el texto */
+  labelClassName?: string;
 }
 
 /**
- * Spinner de carga unificado.
- * Reemplaza todas las instancias de:
- *   <div className="flex items-center justify-center min-h-[40vh]">
- *     <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-slate-800"></div>
- *   </div>
+ * Loader de carga unificado.
+ * Usa el anillo animado definido en index.css (.gs-loader).
  */
-export default function LoadingSpinner({ minHeight = '40vh', size = 48, className = '' }: LoadingSpinnerProps) {
+export default function LoadingSpinner({
+  minHeight = '60vh',
+  size = 64,
+  className = '',
+  color1,
+  color2,
+  label,
+  labelClassName = 'mt-4 text-sm text-slate-600',
+}: LoadingSpinnerProps) {
   return (
     <div
-      className={`flex items-center justify-center w-full ${className}`}
+      className={`flex flex-col items-center justify-center w-full ${className}`}
       style={{ minHeight }}
     >
-      <div
-        className="animate-spin rounded-full border-4 border-slate-200 border-t-[#002855]"
-        style={{ width: size, height: size }}
-      />
+      <Loader size={size} color1={color1} color2={color2} />
+      {label && <p className={labelClassName}>{label}</p>}
     </div>
   );
 }

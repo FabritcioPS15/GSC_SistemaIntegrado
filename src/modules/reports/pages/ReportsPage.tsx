@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { BarChart3, Download, FileText, Search, X, Loader2 } from 'lucide-react';
+import { BarChart3, Download, FileText, Search, X } from 'lucide-react';
 import { FaFilePdf } from 'react-icons/fa6';
 import { RiFileExcel2Fill } from 'react-icons/ri';
 import ExcelJS from 'exceljs';
@@ -7,6 +7,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from '../../../shared/services/supabase';
 import { useNotify } from '../../../shared/hooks/useNotify';
+import LoadingSpinner from '../../../shared/components/ui/LoadingSpinner';
+import Loader from '../../../shared/components/ui/Loader';
 
 type ReportSource = 'assets' | 'tickets' | 'maintenance' | 'spare_parts' | 'cameras' | 'servers' | 'vehiculos';
 
@@ -177,12 +179,7 @@ export default function ReportsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <Loader2 size={32} className="animate-spin text-[#002855] mx-auto mb-4" />
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando reportes...</p>
-        </div>
-      </div>
+      <LoadingSpinner label="Cargando reportes..." />
     );
   }
 
@@ -207,7 +204,7 @@ export default function ReportsPage() {
                 disabled={exporting !== null}
                 className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50"
               >
-                {exporting === 'excel' ? <Loader2 size={14} className="animate-spin" /> : <RiFileExcel2Fill size={16} />}
+                {exporting === 'excel' ? <Loader size={14} /> : <RiFileExcel2Fill size={16} />}
                 Excel
               </button>
               <button
@@ -215,7 +212,7 @@ export default function ReportsPage() {
                 disabled={exporting !== null}
                 className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all disabled:opacity-50"
               >
-                {exporting === 'pdf' ? <Loader2 size={14} className="animate-spin" /> : <FaFilePdf size={16} />}
+                {exporting === 'pdf' ? <Loader size={14} /> : <FaFilePdf size={16} />}
                 PDF
               </button>
             </div>

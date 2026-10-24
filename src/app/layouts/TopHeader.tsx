@@ -1,50 +1,104 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 // Forzar importación para evitar caché
-import { Settings, HelpCircle, Menu, Image as ImageIcon, Check, User as UserIcon, LogOut, ChevronRight, ChevronDown, Search, Plus, X, RefreshCw, BarChart3, Package, Wrench, Calendar, Camera, Users as UsersIcon, Clipboard, Ticket, LayoutGrid, AlertTriangle, MapPin } from 'lucide-react';
-import { FaTerminal } from "react-icons/fa";
+import { Home, Settings, HelpCircle, Menu, Image as ImageIcon, Check, User as UserIcon, LogOut, ChevronRight, Calendar, AlertTriangle, MapPin } from 'lucide-react';
 import { supabase, SutranVisit } from '../../shared/services/supabase';
 import { useAuth } from '../providers/AuthContext';
 import NotificationsFinal from '../../shared/components/NotificationsFinal';
-import { RiFileExcel2Fill } from 'react-icons/ri';
-import { FaFilePdf } from 'react-icons/fa6';
+import Loader from '../../shared/components/ui/Loader';
 
 const ROUTE_LABELS: Record<string, string> = {
+    // Módulos principales
+    'dashboard': 'Dashboard',
     'inventory': 'Inventario',
-    'camara': 'Cámaras',
     'cameras': 'Cámaras',
+    'camara': 'Cámaras',
     'maintenance': 'Mantenimiento',
     'sent': 'Enviados',
+    'checklist': 'Checklist',
+    'vacations': 'Vacaciones',
+    'cvs': 'Recursos Humanos',
     'sutran': 'Sutran',
     'locations': 'Sedes',
+    'companies': 'Empresas',
     'mtc': 'MTC Accesos',
     'users': 'Usuarios',
+    'servers': 'Servidores',
+    'flota-vehicular': 'Flota Vehicular',
+    'requests': 'Requerimientos',
+    'spare-parts': 'Repuestos',
+    'titulos-habilitantes': 'Títulos Habilitantes',
+    'planos-defensa-civil': 'Planos Defensa Civil',
     'audit': 'Auditoría',
     'integrity': 'Integridad',
     'diagnostic': 'Diagnóstico',
     'connection-test': 'Prueba de Conexión',
     'quick-diagnostic': 'Diagnóstico Rápido',
     'tickets': 'Mesa de Ayuda',
-    'dashboard': 'Dashboard General',
+
+    // Sub-rutas específicas
     'mine': 'Mis Tickets',
     'reports': 'Reportes',
     'painpoint': 'Puntos Críticos',
-    'checklist': 'Checklist',
-    'comentarios': 'Comentarios',
-    'observaciones': 'Comentarios',
-    'vacations': 'Vacaciones',
-    'servers': 'Servidores',
-    'flota-vehicular': 'Flota Vehicular',
-    'spare-parts': 'Repuestos',
+    'comentarios': 'Observaciones',
+    'observaciones': 'Observaciones',
+    'future-visits': 'Próximas Visitas',
     'all': 'Ver Todo',
+
+    // Tipos de Negocio
     'escon': 'ESCON',
     'ecsal': 'ECSAL',
     'citv': 'CITV',
+    'policlinico': 'ECSAL',
+    'escuela_conductores': 'ESCON',
+    'revision': 'CITV',
     'lima': 'Lima',
     'provincias': 'Provincias',
+
+    // Estados
     'pending': 'Pendientes',
     'in-progress': 'En Progreso',
     'completed': 'Completados',
+
+    // Categorías de Inventario / Mantenimiento
+    'tecnologia': 'Tecnología',
+    'muebles': 'Muebles y Enseres',
+    'herramientas': 'Herramientas e Instalaciones',
+    'infraestructura': 'Infraestructura',
+    'vehiculos': 'Vehículos',
+    'equipos_de_linea': 'Equipos de Línea',
+    'equipos-de-linea': 'Equipos de Línea',
+    'pc': 'Equipos de Línea',
+    'servidores': 'Servidores',
+    'impresoras': 'Impresoras',
+    'laptops': 'Laptops',
+    'pcs': 'PCs',
+    'monitores': 'Monitores',
+    'switches': 'Switches',
+    'routers': 'Routers',
+    'access-points': 'Access Points',
+    'radios': 'Radios',
+    'nvr': 'NVRs',
+    'dvr': 'DVRs',
+    'antenas': 'Antenas',
+    'herramientas-manuales': 'Herramientas Manuales',
+    'herramientas-electricas': 'Herramientas Eléctricas',
+    'equipos-medicion': 'Equipos de Medición',
+    'mobiliario': 'Mobiliario',
+    'sillas': 'Sillas y Sillones',
+    'escritorios': 'Escritorios',
+    'estantes': 'Archivadores y Estantes',
+    'linea-blanca': 'Línea Blanca',
+    'aire-acondicionado': 'Aire Acondicionado',
+    'generadores': 'Grupos Electrógenos',
+    'pozo-tierra': 'Pozos a Tierra',
+    'extintores': 'Extintores',
+    'luces-emergencia': 'Luces de Emergencia',
+    'tableros-electricos': 'Tableros Eléctricos',
+    'disks': 'Discos Duros',
+    'cameras-disks': 'Discos Duros',
+    'ssh': 'Terminal SSH',
+    'ftp': 'Servidores FTP',
 };
 
 
@@ -61,320 +115,38 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
     const location = useLocation();
     const pathnames = location.pathname.split('/').filter(x => x);
     const showBreadcrumbs = location.pathname !== '/login'; // Mostrar breadcrumb siempre excepto en login
-    const isTicketsRoute = location.pathname.startsWith('/tickets');
     const currentPath = location.pathname;
-    // Detectar página actual para acciones específicas
-    const getPageActions = () => {
 
-        if (currentPath === '/' || currentPath === '/dashboard') {
+    // Helper para formatear o buscar la etiqueta de cada segmento del breadcrumb
+    const getSegmentLabel = (segment: string): string => {
+        const lower = segment.toLowerCase();
+        if (ROUTE_LABELS[lower]) return ROUTE_LABELS[lower];
 
-            return {
-
-                show: true,
-
-                title: 'Acciones Dashboard',
-
-                searchPlaceholder: 'Buscar...',
-
-                actions: [
-
-                    { icon: <FaFilePdf size={16} />, label: 'Reportes', action: () => navigate('/tickets/reports') },
-
-                    { icon: <RefreshCw size={16} />, label: 'Actualizar', action: () => window.location.reload() },
-
-                    { icon: <BarChart3 size={16} />, label: 'Estadísticas', action: () => alert('Estadísticas en desarrollo') }
-
-                ]
-
-            };
-
+        // Detectar si es un UUID o un ID numérico para mostrar 'Detalle'
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment) || /^\d+$/.test(segment)) {
+            return 'Detalle';
         }
 
-
-
-        if (currentPath.startsWith('/tickets')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Tickets',
-
-                searchPlaceholder: 'Buscar tickets...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Nuevo Ticket', action: () => window.dispatchEvent(new CustomEvent('tickets:new')) },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Reportes', action: () => navigate('/tickets/reports') },
-
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Descargar Excel', action: () => window.dispatchEvent(new CustomEvent('tickets:export')) },
-
-                    { icon: <Clipboard size={16} />, label: 'Historial', action: () => navigate('/tickets/history') }
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/inventory')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Inventario',
-
-                searchPlaceholder: 'Buscar equipos...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Agregar Equipo', action: () => window.dispatchEvent(new CustomEvent('inventory:new')) },
-
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Exportar Excel', action: () => window.dispatchEvent(new CustomEvent('inventory:export')) },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Exportar PDF', action: () => window.dispatchEvent(new CustomEvent('inventory:export-pdf')) },
-
-                    { icon: <Package size={16} />, label: 'Repuestos', action: () => navigate('/spare-parts') },
-
-                    { icon: <Wrench size={16} />, label: 'Mantenimiento', action: () => navigate('/maintenance') }
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/users')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Usuarios',
-
-                searchPlaceholder: 'Buscar usuarios...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Nuevo Usuario', action: () => window.dispatchEvent(new CustomEvent('users:new')) },
-
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Exportar Excel', action: () => window.dispatchEvent(new CustomEvent('users:export')) },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Exportar PDF', action: () => window.dispatchEvent(new CustomEvent('users:export-pdf')) },
-
-                    { icon: <Settings size={16} />, label: 'Permisos', action: () => alert('Permisos en desarrollo') }
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/flota-vehicular')) {
-
-            return {
-                show: true,
-                title: 'Acciones Flota',
-                actions: [
-                    { icon: <Plus size={16} />, label: 'Agregar Vehículo', action: () => window.dispatchEvent(new CustomEvent('flota:new')) },
-                    { icon: <FaFilePdf size={16} />, label: 'Reporte PDF', action: () => window.dispatchEvent(new CustomEvent('flota:report')) },
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Exportar Excel', action: () => window.dispatchEvent(new CustomEvent('flota:export')) },
-                    { icon: <Wrench size={16} />, label: 'Mantenimiento', action: () => navigate('/maintenance') }
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/sutran')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Sutran',
-
-                searchPlaceholder: 'Buscar visitas...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Nueva Visita', action: () => window.dispatchEvent(new CustomEvent('sutran:new')) },
-
-                    { icon: <Calendar size={16} />, label: 'Calendario', action: () => alert('Calendario en desarrollo') },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Reporte PDF', action: () => window.dispatchEvent(new CustomEvent('sutran:report')) }
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/maintenance')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Mantenimiento',
-
-                searchPlaceholder: 'Buscar mantenimientos...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Nueva Orden', action: () => window.dispatchEvent(new CustomEvent('maintenance:new')) },
-
-                    { icon: <Clipboard size={16} />, label: 'Checklist', action: () => navigate('/checklist') },
-
-                    { icon: <Package size={16} />, label: 'Inventario', action: () => navigate('/inventory') }
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/cameras')) {
-
-            return {
-                show: true,
-                showSearch: false,
-                title: 'Control de Cámaras',
-                actions: [
-                    { icon: <Plus size={16} />, label: 'Agregar Cámara', action: () => window.dispatchEvent(new CustomEvent('cameras:new')) },
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Descargar en Excel', action: () => window.dispatchEvent(new CustomEvent('cameras:export')) },
-                    { icon: <FaFilePdf size={16} />, label: 'Descargar en PDF', action: () => window.dispatchEvent(new CustomEvent('cameras:export-pdf')) },
-                    { icon: <LayoutGrid size={16} />, label: 'Cambiar de vista', action: () => window.dispatchEvent(new CustomEvent('cameras:toggle-view')) },
-                    { icon: <FaTerminal size={16} />, label: 'Descargar Automatización', action: () => { const a = document.createElement('a'); a.href = '/camera_automation.bat'; a.download = 'camera_automation.bat'; document.body.appendChild(a); a.click(); document.body.removeChild(a); } },
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/locations') || currentPath.startsWith('/sedes')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Sedes',
-
-                searchPlaceholder: 'Buscar sedes...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Nueva Sede', action: () => window.dispatchEvent(new CustomEvent('locations:new')) },
-
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Exportar Excel', action: () => window.dispatchEvent(new CustomEvent('locations:export')) },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Exportar PDF', action: () => window.dispatchEvent(new CustomEvent('locations:export-pdf')) },
-
-                    { icon: <Camera size={16} />, label: 'Cámaras', action: () => navigate('/cameras') },
-
-                    { icon: <UsersIcon size={16} />, label: 'Usuarios', action: () => navigate('/users') }
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/companies')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Unidades de Negocio',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Nueva Unidad', action: () => window.dispatchEvent(new CustomEvent('companies:new')) },
-
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Exportar Excel', action: () => window.dispatchEvent(new CustomEvent('companies:export')) },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Exportar PDF', action: () => window.dispatchEvent(new CustomEvent('companies:export-pdf')) },
-
-                ]
-
-            };
-
-        }
-
-
-
-        if (currentPath.startsWith('/servers')) {
-
-            return {
-
-                show: true,
-
-                title: 'Acciones Servidores',
-
-                searchPlaceholder: 'Buscar servidores...',
-
-                actions: [
-
-                    { icon: <Plus size={16} />, label: 'Añadir nuevo servidor', action: () => window.dispatchEvent(new CustomEvent('servers:new')) },
-
-                    { icon: <LayoutGrid size={16} />, label: 'Cambiar vista', action: () => window.dispatchEvent(new CustomEvent('servers:toggle-view')) },
-
-                    { icon: <RiFileExcel2Fill size={16} />, label: 'Descargar Excel', action: () => window.dispatchEvent(new CustomEvent('servers:download')) },
-
-                    { icon: <FaFilePdf size={16} />, label: 'Descargar PDF', action: () => window.dispatchEvent(new CustomEvent('servers:download-pdf')) }
-
-                ]
-
-            };
-
-        }
-
-
-
-        // Para otras páginas, no mostrar acciones por ahora
-
-        return { show: false, showSearch: true };
-
+        // Formato por defecto: convertir guiones y subguiones a espacios y Capitalizar
+        return segment
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
     };
 
+    const breadcrumbItems = useMemo(() => {
+        return pathnames.map((name, index) => {
+            const isLast = index === pathnames.length - 1;
+            const fullPath = `/${pathnames.slice(0, index + 1).join('/')}`;
+            const label = getSegmentLabel(name);
+            return {
+                name,
+                label,
+                path: fullPath,
+                isLast,
+            };
+        });
+    }, [location.pathname]);
 
-
-    const pageActions = getPageActions();
-
-
-
-    // Estado para forzar actualización del breadcrumb
-
-    const [breadcrumbKey, setBreadcrumbKey] = useState(0);
-
-
-
-    // Actions panel state (for ticket routes)
-
-    const [showActions, setShowActions] = useState(false);
-
-    const [searchValue, setSearchValue] = useState('');
-
-    const actionsRef = useRef<HTMLDivElement>(null);
 
 
     const [showUserSettings, setShowUserSettings] = useState(false);
@@ -396,31 +168,11 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
 
 
-    // Forzar actualización del breadcrumb cuando cambia la ruta
-
-    useEffect(() => {
-
-        setBreadcrumbKey(prev => prev + 1);
-
-    }, [location.pathname]);
 
 
 
-    // Close actions panel on route change
-
-    useEffect(() => { setShowActions(false); setSearchValue(''); }, [location.pathname]);
 
 
-
-    // Broadcast search to Tickets page
-
-    useEffect(() => {
-
-        if (!isTicketsRoute) return;
-
-        window.dispatchEvent(new CustomEvent('tickets:search', { detail: searchValue }));
-
-    }, [searchValue, isTicketsRoute]);
 
 
 
@@ -616,25 +368,6 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
 
 
-    // Close actions panel on outside click
-
-    useEffect(() => {
-
-        const handler = (e: MouseEvent) => {
-
-            if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
-
-                setShowActions(false);
-
-            }
-
-        };
-
-        document.addEventListener('mousedown', handler);
-
-        return () => document.removeEventListener('mousedown', handler);
-
-    }, []);
 
 
 
@@ -707,305 +440,62 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
 
 
-                {/* Improved Breadcrumbs with better UX - Desktop Only */}
+                {/* Clean, Modern Breadcrumbs */}
+                {showBreadcrumbs && (
+                    <nav
+                        className="hidden md:flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar py-1"
+                        aria-label="Navegación de migajas de pan"
+                    >
+                        {/* Inicio / Root */}
+                        <button
+                            type="button"
+                            onClick={() => navigate('/')}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs transition-colors shrink-0 select-none ${
+                                breadcrumbItems.length === 0
+                                    ? 'font-semibold text-[#002855] bg-slate-100/90 border border-slate-200'
+                                    : 'text-slate-500 hover:text-[#002855] hover:bg-slate-100/70 font-medium'
+                            }`}
+                            title="Ir al Inicio"
+                        >
+                            <Home size={13} className={breadcrumbItems.length === 0 ? 'text-[#002855]' : 'text-slate-400'} />
+                            <span>Inicio</span>
+                            {breadcrumbItems.length === 0 && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                            )}
+                        </button>
 
-                <nav key={breadcrumbKey} className={`hidden lg:flex items-center gap-2 overflow-hidden min-w-0 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-0' : 'lg:ml-0'}`} aria-label="Navegación de migajas de pan">
-
-                    {showBreadcrumbs && (
-
-                        <>
-
-                            {/* Sistema GSC Root */}
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-
-                                <button
-
-                                    onClick={() => navigate('/')}
-
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-md shadow-sm hover:from-slate-700 hover:to-slate-600 transition-all"
-
-                                    title="Navegar al Dashboard"
-
-                                >
-
-                                    <div className="w-2 h-2 bg-green-400 rounded-full" />
-
-                                    <span className="text-[12px] font-semibold tracking-widest">Sistema GSC</span>
-
-                                </button>
-
+                        {/* Migajas dinámicas */}
+                        {breadcrumbItems.map((item) => (
+                            <div key={item.path} className="flex items-center gap-1.5 shrink-0 min-w-0">
+                                <ChevronRight size={13} className="text-slate-300 shrink-0" aria-hidden="true" />
+                                {item.isLast ? (
+                                    <div
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[#002855] bg-slate-100/90 border border-slate-200 max-w-[220px] truncate select-none shadow-xs"
+                                        title={item.label}
+                                    >
+                                        <span className="truncate">{item.label}</span>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(item.path)}
+                                        className="px-2 py-1 text-xs font-medium text-slate-500 hover:text-[#002855] hover:bg-slate-100/70 transition-colors max-w-[150px] truncate select-none"
+                                        title={`Navegar a ${item.label}`}
+                                    >
+                                        <span className="truncate">{item.label}</span>
+                                    </button>
+                                )}
                             </div>
-
-
-
-                            <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
-                            {/* Ticket Icon for Ticket Routes */}
-                            {isTicketsRoute && (
-                                <>
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                        <button
-                                            onClick={() => navigate('/tickets')}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-md shadow-sm hover:bg-blue-200 transition-all"
-                                            title="Navegar a Tickets">
-                                            <Ticket size={14} />
-                                            <span className="text-[12px] font-semibold tracking-widest">Tickets</span>
-                                        </button>
-                                    </div>
-                                    <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
-
-                                </>
-
-                            )}
-
-
-
-                            {/* Main Module */}
-
-                            {pathnames.length > 0 ? (
-
-                                <>
-
-                                    <div className="flex items-center gap-1.5 shrink-0">
-
-                                        {pathnames.length === 1 ? (
-
-                                            <button
-
-                                                onClick={() => navigate(`/${pathnames[0]}`)}
-
-                                                className="flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-slate-700 tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all"
-
-                                                title={`Navegar a ${ROUTE_LABELS[pathnames[0].toLowerCase()] || pathnames[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
-
-                                            >
-
-                                                <span>{ROUTE_LABELS[pathnames[0].toLowerCase()] || pathnames[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-
-                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
-
-                                            </button>
-
-                                        ) : (
-
-                                            <button
-
-                                                onClick={() => navigate(`/${pathnames[0]}`)}
-
-                                                className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold text-slate-500 tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-
-                                                title={`Navegar a ${ROUTE_LABELS[pathnames[0].toLowerCase()] || pathnames[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
-
-                                                aria-label={`Navegar a ${ROUTE_LABELS[pathnames[0].toLowerCase()] || pathnames[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
-
-                                            >
-
-                                                <span className="truncate">{ROUTE_LABELS[pathnames[0].toLowerCase()] || pathnames[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-
-                                            </button>
-
-                                        )}
-
-                                    </div>
-
-
-
-                                    {/* Sub-routes */}
-
-                                    {pathnames.length > 1 && (
-
-                                        <>
-
-                                            <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
-
-                                            {pathnames.slice(1).map((name, index) => {
-
-                                                const isLast = index === pathnames.slice(1).length - 1;
-
-                                                const fullPath = `/${pathnames.slice(0, index + 2).join('/')}`;
-
-                                                const label = ROUTE_LABELS[name.toLowerCase()] || name.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-
-
-                                                return (
-
-                                                    <div key={fullPath} className="flex items-center gap-1.5 shrink-0 min-w-0">
-
-                                                        {isLast ? (
-
-                                                            <button
-
-                                                                onClick={() => navigate(fullPath)}
-
-                                                                className="flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-slate-700 tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all truncate max-w-[180px] sm:max-w-[250px]"
-
-                                                                title={`Navegar a ${label}`}
-
-                                                            >
-
-                                                                <span className="truncate">{label}</span>
-
-                                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
-
-                                                            </button>
-
-                                                        ) : (
-
-                                                            <>
-
-                                                                <ChevronRight size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
-
-                                                                <button
-
-                                                                    onClick={() => navigate(fullPath)}
-
-                                                                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold text-slate-500 tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all truncate max-w-[100px] sm:max-w-[150px] group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-
-                                                                    title={`Navegar a ${label}`}
-
-                                                                    aria-label={`Navegar a ${label}`}
-
-                                                                >
-
-                                                                    <span className="truncate">{label}</span>
-
-                                                                </button>
-
-                                                            </>
-
-                                                        )}
-
-                                                    </div>
-
-                                                );
-
-                                            })}
-
-                                        </>
-
-                                    )}
-
-                                </>
-
-                            ) : (
-
-                                /* Dashboard como módulo actual cuando no hay pathnames */
-                                <button
-                                    onClick={() => navigate('/')}
-                                    className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold text-slate-700 tracking-widest hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all"
-                                    title="Navegar al Dashboard"
-                                >
-                                    <span>Dashboard</span>
-                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
-                                </button>
-                            )}
-                        </>
-                    )}
-                </nav>
+                        ))}
+                    </nav>
+                )}
             </div>
 
 
 
             <div className="flex items-center gap-2">
 
-                {/* Dynamic Page Actions Dropdown */}
-
-                {pageActions.show && (
-
-                    <div className="relative" ref={actionsRef}>
-
-                        <button
-
-                            onClick={() => setShowActions(v => !v)}
-
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-semibold tracking-widest font-sans transition-all ${showActions ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900'}`}
-
-                        >
-
-                            <Plus size={13} />
-
-                            ACCIONES
-
-                            <ChevronDown size={13} className={`transition-transform duration-200 ${showActions ? 'rotate-180' : ''}`} />
-
-                        </button>
-
-
-
-                        {showActions && (
-
-                            <div className="absolute left-1/3 sm:right-0 top-full mt-2 w-80 sm:w-72 bg-[#001e3c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200] animate-in fade-in slide-in-from-top-2 duration-200 sm:left-auto left-1/3 sm:translate-x-0 -translate-x-1/3 font-sans">
-
-                                {pageActions.showSearch !== false && (
-
-                                    <div className="p-4 border-b border-white/10">
-
-                                        <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wider mb-3 font-sans">{pageActions.title}</p>
-
-                                        <div className="relative">
-
-                                            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-
-                                            <input
-
-                                                autoFocus
-
-                                                type="text"
-
-                                                value={searchValue}
-
-                                                onChange={e => setSearchValue(e.target.value)}
-
-                                                placeholder={pageActions.searchPlaceholder}
-
-                                                className="w-full bg-white/10 border border-white/10 rounded-xl pl-8 pr-8 py-2.5 text-[11px] text-white placeholder-white/30 font-medium outline-none focus:border-blue-500/50 focus:bg-white/15 transition-all"
-
-                                            />
-
-                                            {searchValue && (
-
-                                                <button onClick={() => setSearchValue('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
-
-                                                    <X size={13} />
-
-                                                </button>
-
-                                            )}
-
-                                        </div>
-
-                                    </div>
-
-                                )}
-
-                                <div className="p-3 space-y-2">
-
-                                    {pageActions.actions?.map((action, index) => (
-
-                                        <button
-
-                                            key={index}
-
-                                            onClick={() => { action.action(); setShowActions(false); }}
-
-                                            className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[12px] font-semibold tracking-wide transition-all active:scale-95 shadow-lg shadow-blue-900/30 font-sans"
-
-                                        >
-
-                                            {action.icon}
-
-                                            {action.label}
-
-                                        </button>
-
-                                    )) || []}
-
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
                 <div className="flex items-center gap-1">
                     {/* Sistema de Notificaciones - FUNCIONANDO */}
                     <NotificationsFinal />
@@ -1374,7 +864,7 @@ export default function TopHeader({ onMobileMenuClick, sidebarCollapsed }: TopHe
 
                                             {isSaving ? (
 
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                <Loader size={16} color1="rgba(255,255,255,0.3)" color2="#ffffff" />
 
                                             ) : (
 
