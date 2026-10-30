@@ -37,7 +37,9 @@ import {
   Map,
   FileCheck,
   BarChart3,
-  DollarSign
+  DollarSign,
+  FolderOpen,
+  ExternalLink
 } from 'lucide-react';
 import { GiCctvCamera } from 'react-icons/gi';
 import { Trash2 } from 'lucide-react';
@@ -61,6 +63,9 @@ interface MenuItem {
   path: string;
   hasSubmenu?: boolean;
   submenu?: SubmenuItem[];
+  /** Si es true, el item se abre en una nueva pestaña (enlace externo). */
+  external?: boolean;
+  permissionId?: string;
 }
 
 interface Section {
@@ -216,6 +221,14 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
         { id: 'locations', label: 'Sedes', icon: MapPin, path: '/locations' },
         { id: 'companies', label: 'Unidades de Negocio', icon: Building, path: '/companies' },
         { id: 'sutran', label: 'Sutran', icon: Building2, path: '/sutran' },
+        {
+          id: 'sutran-folder',
+          label: 'Folder SUTRAN',
+          icon: FolderOpen,
+          path: 'https://docs.google.com/spreadsheets/d/1q9VILTgU3sQey9pJpHbvvbMwMytrLF1gai-LLe8ZAfs/edit?gid=847590788#gid=847590788',
+          permissionId: 'sutran',
+          external: true,
+        },
         { id: 'mtc', label: 'MTC Accesos', icon: Key, path: '/mtc' },
         { id: 'servers', label: 'Servidores', icon: GrServerCluster, path: '/servers' },
         { id: 'titulos-habilitantes', label: 'Títulos Habilitantes', icon: Award, path: '/titulos-habilitantes' },
@@ -291,7 +304,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
         <div className="flex-1 overflow-y-auto sidebar-scroll py-2 flex flex-col">
           {sections.map((section, index) => {
             const filteredItems = section.items.filter(item => {
-              if (!hasPermission(item.id)) return false;
+              if (!hasPermission(item.permissionId ?? item.id)) return false;
               if (item.submenu) return item.submenu.some(sub => hasPermission(sub.id));
               return true;
             });
@@ -308,6 +321,38 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
                 <div className="space-y-1">
                   {filteredItems.map(item => {
                     const Icon = item.icon;
+
+                    if (item.external) {
+                      return (
+                        <div key={item.id} className="relative mb-0.5 last:mb-0">
+                          <a
+                            href={item.path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => { if (window.innerWidth < 1024) onCloseMobile?.(); }}
+                            className={`
+                              relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group/link
+                              text-slate-300 hover:text-white hover:bg-white/10
+                              ${collapsed ? 'justify-center px-0 h-12' : ''}
+                            `}
+                          >
+                            <Icon
+                              size={collapsed ? 24 : 20}
+                              className="shrink-0 transition-transform duration-200 text-slate-400 group-hover/link:text-white group-hover/link:scale-110"
+                            />
+                            {!collapsed && (
+                              <>
+                                <span className="text-[16px] font-medium tracking-wide flex-1 truncate">
+                                  {item.label}
+                                </span>
+                                <ExternalLink size={14} className="opacity-30 group-hover/link:opacity-100" />
+                              </>
+                            )}
+                          </a>
+                        </div>
+                      );
+                    }
+
                     const isActive = isPathActive(item.path);
                     const isSubmenuOpen = openSubmenus.has(item.id);
 
