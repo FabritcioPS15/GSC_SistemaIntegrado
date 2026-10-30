@@ -370,7 +370,7 @@ export default function QuotationsPage() {
               {(selected.items || []).length > 0 && (
                 <DetailModalSection title="Items" className="col-span-full">
                   <div className="bg-white border border-slate-200">
-                    <table className="w-full text-left">
+                    <table className="gsc-table w-full text-left">
                       <thead className="bg-[#002855] text-white">
                         <tr>
                           <th className="px-4 py-2 text-[9px] font-normal uppercase tracking-widest">Descripción</th>

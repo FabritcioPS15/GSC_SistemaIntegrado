@@ -766,6 +766,8 @@ export type VehicleType = {
 
   image_position?: string;
 
+  categoria?: string;
+
   created_at?: string;
 
   updated_at?: string;

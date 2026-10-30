@@ -34,7 +34,7 @@ interface QuickStats {
   maintenanceVehicles: number;
   totalTickets: number;
   openTickets: number;
-  attendedTickets: number;
+  inProgressTickets: number;
   resolvedTickets: number;
   closedTickets: number;
   archivedTickets: number;
@@ -74,7 +74,7 @@ export default function Dashboard() {
     maintenanceVehicles: 0,
     totalTickets: 0,
     openTickets: 0,
-    attendedTickets: 0,
+    inProgressTickets: 0,
     resolvedTickets: 0,
     closedTickets: 0,
     archivedTickets: 0,
@@ -244,7 +244,7 @@ export default function Dashboard() {
 
       // Process tickets
       const openTickets = tickets?.filter(t => t.status === 'open').length || 0;
-      const attendedTickets = tickets?.filter(t => t.status === 'attended').length || 0;
+      const inProgressTickets = tickets?.filter(t => t.status === 'in_progress').length || 0;
       const resolvedTickets = tickets?.filter(t => t.status === 'resolved').length || 0;
       const closedTickets = tickets?.filter(t => t.status === 'closed').length || 0;
       const archivedTickets = tickets?.filter(t => t.status === 'archived').length || 0;
@@ -351,7 +351,7 @@ export default function Dashboard() {
         maintenanceVehicles,
         totalTickets: totalTickets || 0,
         openTickets,
-        attendedTickets,
+        inProgressTickets,
         resolvedTickets,
         closedTickets,
         archivedTickets,
@@ -556,7 +556,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-[10px] font-normal text-slate-500 uppercase tracking-widest">{stats.attendedTickets} Tickets en atención</span>
+                  <span className="text-[10px] font-normal text-slate-500 uppercase tracking-widest">{stats.inProgressTickets} Tickets en atención</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>

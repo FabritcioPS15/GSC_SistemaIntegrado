@@ -65,7 +65,7 @@ export function DetailModalHeader({
 export function DetailModalBody({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3 sm:p-5 md:p-6 lg:p-8 min-h-0 ${className}`}
+      className={`flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3 sm:px-5 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8 min-h-0 ${className}`}
     >
       {children}
     </div>

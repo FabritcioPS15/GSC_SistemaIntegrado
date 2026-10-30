@@ -10,7 +10,7 @@ import React from 'react';
 export function Table({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className="overflow-x-auto relative group/table">
-      <table className={`w-full text-left border-collapse border-spacing-0 ${className}`}>
+      <table className={`gsc-table w-full text-left border-collapse border-spacing-0 ${className}`}>
         {children}
       </table>
     </div>

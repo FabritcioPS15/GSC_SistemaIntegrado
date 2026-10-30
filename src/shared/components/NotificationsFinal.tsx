@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, Clock, Plus, CheckCircle, Archive, User, MapPin, Calendar, CalendarDays, CheckSquare, Trash2, X } from 'lucide-react';
 import { useAuth } from '../../app/providers/AuthContext';
 import { supabase } from '../services/supabase';
+import { useNotify } from '../hooks/useNotify';
 
 // ─── Audio global compartido ───────────────────────────────────────────────
 // Mantenemos un único AudioContext reutilizable para evitar que el navegador
@@ -92,6 +93,85 @@ const playNotificationSound = () => {
   }
 };
 
+/**
+ * Secuencia de tonos simple y suave, usada para los cambios de estado.
+ * Volumen bajo para diferenciarla claramente de la alerta de ticket nuevo.
+ */
+const playSoftTones = (
+  notes: Array<{ freq: number; offset: number; duration: number; type?: OscillatorType }>
+) => {
+  try {
+    const ctx = getAudioContext();
+
+    const fire = () => {
+      notes.forEach(({ freq, offset, duration, type = 'sine' }) => {
+        const t = ctx.currentTime + offset;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.12, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + duration + 0.02);
+      });
+    };
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(fire).catch(() => { });
+    } else {
+      fire();
+    }
+  } catch (err) {
+    console.warn('⚠️ No se pudo reproducir el sonido de estado:', err);
+  }
+};
+
+/** Cambio de estado (en atención / resuelto): dos notas cortas ascendentes y suaves. */
+const playStatusNotificationSound = () => {
+  playSoftTones([
+    { freq: 660, offset: 0, duration: 0.12 },
+    { freq: 880, offset: 0.13, duration: 0.12 },
+  ]);
+};
+
+/** Ticket finalizado / cerrado: dos notas descendentes y graves, distintas del cambio de estado. */
+const playClosedNotificationSound = () => {
+  playSoftTones([
+    { freq: 523, offset: 0, duration: 0.16, type: 'triangle' },
+    { freq: 349, offset: 0.18, duration: 0.24, type: 'triangle' },
+  ]);
+};
+
+/** Elige el sonido según el tipo de notificación. */
+const playNotificationSoundForType = (type: string) => {
+  switch (type) {
+    case 'ticket_created':
+    case 'sutran_visit_scheduled':
+      // Alerta fuerte solo para eventos nuevos
+      playNotificationSound();
+      break;
+    case 'ticket_closed':
+    case 'sutran_visit_completed':
+      // Finalizado / cerrado
+      playClosedNotificationSound();
+      break;
+    case 'ticket_attended':
+    case 'ticket_resolved':
+      // Cambio de estado
+      playStatusNotificationSound();
+      break;
+    default:
+      break;
+  }
+};
+
 type Notification = {
   id: string;
   type: 'ticket_created' | 'ticket_attended' | 'ticket_resolved' | 'ticket_closed' | 'sutran_visit_scheduled' | 'sutran_visit_completed';
@@ -108,12 +188,14 @@ type Notification = {
 export default function NotificationsFinal() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { success: notifySuccess, error: notifyError } = useNotify();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'read'>('unread');
+  const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread');
+  const [clearing, setClearing] = useState(false);
   // true una vez que el AudioContext fue desbloqueado por gesto del usuario
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   // IDs de notificaciones ya conocidas — no disparan sonido al iniciar
@@ -161,16 +243,18 @@ export default function NotificationsFinal() {
           console.log('🔔 RECIBIDO EVENTO DE SUPABASE:', payload);
           const newNotification = payload.new as Notification;
 
-          console.log('🔔 NUEVA NOTIFICACIÓN RECIBIDA:', newNotification);
-          console.log('🔊 Intentando reproducir sonido...');
-
           // Agregar la notificación inmediatamente
           setNotifications(prev => [newNotification, ...prev].slice(0, 50));
           setUnreadCount(prev => prev + 1);
 
-          // Reproducir sonido de notificación con volumen máximo
+          // Registrar el ID para que el polling de respaldo no repita el sonido
+          if (knownIdsRef.current) {
+            knownIdsRef.current.add(newNotification.id);
+          }
+
+          // Reproducir el sonido correspondiente al tipo de notificación
           try {
-            playNotificationSound();
+            playNotificationSoundForType(newNotification.type);
             console.log('✅ Sonido de notificación ejecutado');
           } catch (error) {
             console.error('❌ Error ejecutando sonido:', error);
@@ -241,8 +325,15 @@ export default function NotificationsFinal() {
           if (newOnes.length > 0) {
             // Registrar nuevos IDs para no volver a sonar
             newOnes.forEach(n => knownIdsRef.current!.add(n.id));
-            // ¡Disparar sonido! El AudioContext ya fue desbloqueado por el usuario.
-            playNotificationSound();
+
+            // Priorizar la alerta de ticket nuevo sobre los cambios de estado
+            if (newOnes.some(n => n.type === 'ticket_created' || n.type === 'sutran_visit_scheduled')) {
+              playNotificationSound();
+            } else if (newOnes.some(n => n.type === 'ticket_closed' || n.type === 'sutran_visit_completed')) {
+              playClosedNotificationSound();
+            } else {
+              playStatusNotificationSound();
+            }
           }
         }
 
@@ -308,7 +399,6 @@ export default function NotificationsFinal() {
   };
 
   const deleteNotification = async (notificationId: string) => {
-    console.log('🗑️ Deleting notification:', notificationId);
     try {
       const { error } = await supabase
         .from('notifications')
@@ -316,7 +406,6 @@ export default function NotificationsFinal() {
         .eq('id', notificationId);
 
       if (!error) {
-        console.log('✅ Notification deleted successfully');
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
         const deletedNotification = notifications.find(n => n.id === notificationId);
         if (deletedNotification && !deletedNotification.read) {
@@ -331,22 +420,38 @@ export default function NotificationsFinal() {
   };
 
   const clearAllNotifications = async () => {
-    console.log('🗑️ Clearing all notifications for role:', user?.role);
+    if (!user) return;
+
+    setClearing(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .delete()
-        .eq('target_role', user?.role);
+        .eq('target_role', user.role)
+        .select('id');
 
-      if (!error) {
-        console.log('✅ All notifications cleared successfully');
-        setNotifications([]);
-        setUnreadCount(0);
-      } else {
-        console.log('❌ Error clearing notifications:', error);
+      if (error) {
+        console.error('❌ Error clearing notifications:', error);
+        notifyError('No se pudieron eliminar las notificaciones. Intenta nuevamente.');
+        return;
       }
+
+      // Si RLS bloquea el DELETE, Supabase devuelve 0 filas sin error.
+      if (!data || data.length === 0) {
+        await fetchNotifications();
+        notifyError('No se pudieron eliminar las notificaciones. Verifica los permisos de la tabla.');
+        return;
+      }
+
+      setNotifications([]);
+      setUnreadCount(0);
+      setActiveTab('unread');
+      notifySuccess('Notificaciones eliminadas correctamente.', 'Limpiar notificaciones');
     } catch (error) {
-      console.log('❌ Error clearing notifications:', error);
+      console.error('❌ Error clearing notifications:', error);
+      notifyError('Ocurrió un error al limpiar las notificaciones.');
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -489,11 +594,12 @@ export default function NotificationsFinal() {
                   {notifications.length > 0 && (
                     <button
                       onClick={clearAllNotifications}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all text-xs font-normal"
+                      disabled={clearing}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-all text-xs font-normal disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Limpiar todas las notificaciones"
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>Limpiar</span>
+                      <span>{clearing ? 'Limpiando...' : 'Limpiar'}</span>
                     </button>
                   )}
                 </div>
@@ -501,15 +607,6 @@ export default function NotificationsFinal() {
 
               {/* Tabs */}
               <div className="flex gap-2 border-b border-slate-100">
-                <button
-                  onClick={() => setActiveTab('all')}
-                  className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 ${activeTab === 'all'
-                    ? 'text-blue-600 border-blue-600'
-                    : 'text-white border-transparent hover:text-slate-700'
-                    }`}
-                >
-                  Todas ({notifications.length})
-                </button>
                 <button
                   onClick={() => setActiveTab('unread')}
                   className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 ${activeTab === 'unread'

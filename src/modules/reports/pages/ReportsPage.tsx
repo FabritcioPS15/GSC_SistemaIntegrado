@@ -296,7 +296,7 @@ export default function ReportsPage() {
 
             {/* Data table - desktop */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
+              <table className="gsc-table w-full">
                 <thead>
                   <tr className="border-b border-slate-100">
                     {filteredData[0] && Object.keys(filteredData[0]).slice(0, 8).map(key => (

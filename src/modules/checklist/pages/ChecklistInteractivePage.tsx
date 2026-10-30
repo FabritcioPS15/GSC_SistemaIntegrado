@@ -682,7 +682,7 @@ export default function ChecklistInteractive() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="gsc-table w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-6 py-6 text-[12px] font-normal text-[#002855] tracking-[0.2em]">Cuestionario</th>

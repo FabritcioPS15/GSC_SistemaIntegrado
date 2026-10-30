@@ -223,7 +223,7 @@ export function FormField({
 
   return (
     <div data-label={label} className={`flex flex-col ${className} ${gridClass}`}>
-      <label className="flex items-end text-[10px] font-semibold text-slate-600 mb-1.5 ml-1 min-h-[24px]">
+      <label className="flex items-end text-[10px] font-normal text-slate-600 mb-1.5 min-h-[24px]">
         <span className="line-clamp-2 leading-tight">
           {label} {required && <span className="text-red-500 ml-0.5">*</span>}
         </span>
@@ -232,7 +232,7 @@ export function FormField({
         {children}
       </div>
       {error && (
-        <p className="text-red-500 text-[10px] font-normal mt-1.5 ml-1">{error}</p>
+        <p className="text-red-500 text-[10px] font-normal mt-1.5">{error}</p>
       )}
     </div>
   );

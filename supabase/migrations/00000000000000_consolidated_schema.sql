@@ -315,6 +315,7 @@ CREATE TABLE IF NOT EXISTS public.vehiculos (
     imagen_url                TEXT,
     color                     TEXT,
     image_position            TEXT DEFAULT 'center',
+    categoria                 TEXT,
     citv_emision              DATE,
     citv_vencimiento          DATE,
     soat_emision              DATE,
@@ -930,6 +931,7 @@ ALTER TABLE public.servers ADD COLUMN IF NOT EXISTS backup_scanner_password TEXT
 ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS imagen_url TEXT;
 ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS color TEXT;
 ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS image_position TEXT DEFAULT 'center';
+ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS categoria TEXT;
 ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS citv_emision DATE;
 ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS citv_vencimiento DATE;
 ALTER TABLE public.vehiculos ADD COLUMN IF NOT EXISTS soat_emision DATE;

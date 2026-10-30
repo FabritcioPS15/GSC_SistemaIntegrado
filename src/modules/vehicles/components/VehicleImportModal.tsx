@@ -121,6 +121,7 @@ export default function VehicleImportModal({ isOpen, onClose, onSuccess, locatio
                     placa: String(placa).toUpperCase().trim(),
                     marca: String(marca).trim(),
                     modelo: String(modelo || 'Genérico').trim(),
+                    categoria: normalizedRow['CATEGORIA'] || normalizedRow['CATEGORÍA'] || null,
                     año: normalizedRow['AÑO'] ? Number(normalizedRow['AÑO']) : new Date().getFullYear(),
                     tipo_combustible: (normalizedRow['COMBUSTIBLE'] || 'gasolina').toLowerCase(), // gasolina, diesel, etc
                     kilometraje: Number(normalizedRow['KILOMETRAJE'] || 0),
@@ -378,7 +379,7 @@ export default function VehicleImportModal({ isOpen, onClose, onSuccess, locatio
                                     <span className="text-xs text-slate-500">Cada hoja debería ser una sede/escuela</span>
                                 </div>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
+                                    <table className="gsc-table w-full text-sm text-left">
                                         <thead className="bg-slate-50 text-slate-500 text-xs font-normal">
                                             <tr>
                                                 <th className="px-6 py-3">Hoja (Excel)</th>

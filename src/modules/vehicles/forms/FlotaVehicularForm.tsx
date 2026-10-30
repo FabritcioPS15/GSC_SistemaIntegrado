@@ -20,6 +20,7 @@ export default function FlotaVehicularForm({ onClose, onSave, editVehicle }: Flo
     placa: editVehicle?.placa || '',
     marca: editVehicle?.marca || '',
     modelo: editVehicle?.modelo || '',
+    categoria: editVehicle?.categoria || '',
     color: editVehicle?.color || '',
     año: editVehicle?.año || new Date().getFullYear(),
     estado: editVehicle?.estado || 'activa',
@@ -92,6 +93,7 @@ export default function FlotaVehicularForm({ onClose, onSave, editVehicle }: Flo
       placa: formData.placa.toUpperCase().trim(),
       marca: formData.marca.trim(),
       modelo: formData.modelo.trim(),
+      categoria: formData.categoria.trim() || null,
       color: formData.color.trim() || null,
       año: formData.año,
       estado: formData.estado,
@@ -205,6 +207,26 @@ export default function FlotaVehicularForm({ onClose, onSave, editVehicle }: Flo
               placeholder="Blanco, Negro, Gris"
               error={errors.color}
             />
+          </FormField>
+
+          <FormField label="Categoría" error={errors.categoria}>
+            <FormInput
+              type="text"
+              name="categoria"
+              value={formData.categoria}
+              onChange={handleChange}
+              placeholder="Seleccionar"
+              list="categorias-vehiculo"
+              error={errors.categoria}
+            />
+            <datalist id="categorias-vehiculo">
+              <option value="L5" />
+              <option value="M1" />
+              <option value="M2" />
+              <option value="M3" />
+              <option value="N2" />
+              <option value="N3" />
+            </datalist>
           </FormField>
 
           <FormField label="Año" error={errors.año}>

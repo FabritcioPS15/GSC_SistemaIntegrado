@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { Plus, Edit, Trash2, MapPin, X, Car, List, Search, ChevronDown, AlertTriangle, Calendar, Filter } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { Plus, Edit, Trash2, MapPin, X, Car, List, Search, Calendar, Filter } from 'lucide-react';
 import { RiFileExcel2Fill } from "react-icons/ri";
 import { FaFilePdf } from "react-icons/fa6";
 import ExcelJS from 'exceljs';
@@ -38,6 +38,7 @@ type Vehiculo = {
   placa: string;
   marca: string;
   modelo: string;
+  categoria?: string;
   año: number;
   estado: 'activa' | 'inactiva' | 'en_proceso';
   ubicacion_actual: string;
@@ -65,6 +66,7 @@ export default function FlotaVehicular() {
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editing, setEditing] = useState<Vehiculo | undefined>();
   const [filterEstado, setFilterEstado] = useState<string[]>([]);
+  const [filterCategoria, setFilterCategoria] = useState<string[]>([]);
   const [selectedRubros, setSelectedRubros] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [schools, setSchools] = useState<Location[]>([]);
@@ -78,27 +80,15 @@ export default function FlotaVehicular() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
-  const [showVencimientoMenu, setShowVencimientoMenu] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedVehiculo, setSelectedVehiculo] = useState<Vehiculo | undefined>();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { selectionMode, setSelectionMode } = useSelectionMode();
-  const vencimientoMenuRef = useRef<HTMLDivElement>(null);
 
   const handleToggleSelectionMode = () => {
     if (selectionMode) setSelectedIds([]);
     setSelectionMode(!selectionMode);
   };
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (vencimientoMenuRef.current && !vencimientoMenuRef.current.contains(event.target as Node)) {
-        setShowVencimientoMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   useEffect(() => {
     fetchSchools();
@@ -258,7 +248,6 @@ export default function FlotaVehicular() {
       a.download = `Reporte Vencimientos Flota.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      setShowVencimientoMenu(false);
     } catch (e) { console.error(e); }
   };
 
@@ -401,23 +390,30 @@ export default function FlotaVehicular() {
       });
 
       doc.save(`Reporte Vencimientos Flota.pdf`);
-      setShowVencimientoMenu(false);
     } catch (e) { console.error(e); }
   };
 
   const filteredVehiculos = useMemo(() => {
     return vehiculos.filter(v => {
       const q = search.toLowerCase();
-      const searchMatch = !search || v.placa.toLowerCase().includes(q) || v.marca.toLowerCase().includes(q) || v.modelo.toLowerCase().includes(q);
+      const searchMatch = !search || v.placa.toLowerCase().includes(q) || v.marca.toLowerCase().includes(q) || v.modelo.toLowerCase().includes(q) || (v.categoria || '').toLowerCase().includes(q);
       const rubroMatch = selectedRubros.length === 0 || selectedRubros.length === Object.keys(BUSINESS_TYPE_LABELS).length || (() => {
         const school = schools.find(s => s.id === v.ubicacion_actual);
         return school?.business_type ? selectedRubros.includes(school.business_type) : false;
       })();
       const sedeMatch = selectedLocations.length === 0 || selectedLocations.length === schools.length || selectedLocations.includes(v.ubicacion_actual);
       const estadoMatch = filterEstado.length === 0 || filterEstado.includes(v.estado);
-      return searchMatch && rubroMatch && sedeMatch && estadoMatch;
+      const categoriaMatch = filterCategoria.length === 0 || filterCategoria.includes(v.categoria || '');
+      return searchMatch && rubroMatch && sedeMatch && estadoMatch && categoriaMatch;
     });
-  }, [vehiculos, search, selectedRubros, selectedLocations, filterEstado, schools]);
+  }, [vehiculos, search, selectedRubros, selectedLocations, filterEstado, filterCategoria, schools]);
+
+  const categoriasDisponibles = useMemo(() => {
+    const categorias = vehiculos
+      .map(v => (v.categoria || '').trim())
+      .filter(Boolean);
+    return Array.from(new Set(categorias)).sort((a, b) => a.localeCompare(b));
+  }, [vehiculos]);
 
   const sortedVehiculos = useMemo(() => {
     if (!sortConfig) return filteredVehiculos;
@@ -546,7 +542,7 @@ export default function FlotaVehicular() {
       });
 
       // 1. Título y Cabecera del Reporte
-      ws.mergeCells('A1:M1');
+      ws.mergeCells('A1:N1');
       const titleCell = ws.getCell('A1');
       titleCell.value = 'REPORTE GENERAL DE FLOTA VEHICULAR — GRUPO SAN CRISTÓBAL';
       titleCell.font = { name: 'Arial', family: 2, size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -555,7 +551,7 @@ export default function FlotaVehicular() {
       ws.getRow(1).height = 40;
 
       // 2. Información General
-      ws.mergeCells('A2:M2');
+      ws.mergeCells('A2:N2');
       const subtitleCell = ws.getCell('A2');
       subtitleCell.value = `Generado el: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')} | Total de unidades: ${sortedData.length} | Ordenado por Sede`;
       subtitleCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF475569' } };
@@ -580,7 +576,8 @@ export default function FlotaVehicular() {
         { header: 'PÓLIZA VENCE', key: 'poliza', width: 15 },
         { header: 'ALQUILER VENCE', key: 'alquiler', width: 15 },
         { header: 'ÚLT. MANT.', key: 'mantenimiento', width: 15 },
-        { header: 'NOTAS / OBSERVACIONES', key: 'notas', width: 35 }
+        { header: 'NOTAS / OBSERVACIONES', key: 'notas', width: 35 },
+        { header: 'CATEGORÍA', key: 'categoria', width: 18 }
       ];
 
       const headerRowIndex = 4;
@@ -629,7 +626,8 @@ export default function FlotaVehicular() {
           fmtDate(v.poliza_vencimiento),
           fmtDate(v.contrato_alquiler_vencimiento),
           fmtDate(v.fecha_ultimo_mantenimiento),
-          v.notas || '—'
+          v.notas || '—',
+          v.categoria || '—'
         ]);
 
         row.height = 24;
@@ -790,7 +788,8 @@ export default function FlotaVehicular() {
           fmtDate(v.soat_vencimiento),
           fmtDate(v.poliza_vencimiento),
           fmtDate(v.contrato_alquiler_vencimiento),
-          fmtDate(v.fecha_ultimo_mantenimiento)
+          fmtDate(v.fecha_ultimo_mantenimiento),
+          v.categoria || '—'
         ];
       });
 
@@ -798,7 +797,7 @@ export default function FlotaVehicular() {
       autoTable(doc, {
         startY: 38,
         margin: { top: 36 },
-        head: [['Placa', 'Vehículo (Datos Generales)', 'Estado', 'Ubicación', 'CITV Vence', 'SOAT Vence', 'Póliza Vence', 'Contrato Vence', 'Últ. Mant.']],
+        head: [['Placa', 'Vehículo (Datos Generales)', 'Estado', 'Ubicación', 'CITV Vence', 'SOAT Vence', 'Póliza Vence', 'Contrato Vence', 'Últ. Mant.', 'Categoría']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -824,7 +823,8 @@ export default function FlotaVehicular() {
           5: { halign: 'center', cellWidth: 26 },
           6: { halign: 'center', cellWidth: 26 },
           7: { halign: 'center', cellWidth: 26 },
-          8: { halign: 'center', cellWidth: 26 }
+          8: { halign: 'center', cellWidth: 26 },
+          9: { halign: 'center', cellWidth: 24 }
         },
         didParseCell: (data) => {
           if (data.section === 'head') {
@@ -945,8 +945,16 @@ export default function FlotaVehicular() {
                   { value: 'en_proceso', label: 'En Proceso' },
                 ]
               },
+              {
+                key: 'categoria',
+                placeholder: 'TODAS LAS CATEGORÍAS',
+                icon: Car,
+                iconClassName: 'text-indigo-500',
+                wrapperClassName: 'md:min-w-[220px]',
+                options: categoriasDisponibles.map(cat => ({ value: cat, label: cat })),
+              },
             ]}
-            values={{ business_type: selectedRubros, location: selectedLocations, estado: filterEstado }}
+            values={{ business_type: selectedRubros, location: selectedLocations, estado: filterEstado, categoria: filterCategoria }}
             onChange={(key, value) => {
               if (key === 'business_type') {
                 const newRubros = value as string[];
@@ -959,6 +967,8 @@ export default function FlotaVehicular() {
                 setSelectedLocations(value as string[]);
               } else if (key === 'estado') {
                 setFilterEstado(value as string[]);
+              } else if (key === 'categoria') {
+                setFilterCategoria(value as string[]);
               }
               setCurrentPage(1);
             }}
@@ -966,6 +976,7 @@ export default function FlotaVehicular() {
               setSelectedRubros([]);
               setSelectedLocations([]);
               setFilterEstado([]);
+              setFilterCategoria([]);
               setCurrentPage(1);
             }}
           />
@@ -986,14 +997,28 @@ export default function FlotaVehicular() {
             selectionMode={
               canEdit()
                 ? {
-                    active: selectionMode,
-                    onToggle: handleToggleSelectionMode,
-                    selectedCount: selectedIds.length,
-                  }
+                  active: selectionMode,
+                  onToggle: handleToggleSelectionMode,
+                  selectedCount: selectedIds.length,
+                }
                 : undefined
             }
             onExportExcel={handleExportExcel}
             onExportPDF={handleExportPdf}
+            extraActions={[
+              {
+                label: 'Vencimientos (Excel)',
+                icon: <RiFileExcel2Fill size={16} className="text-emerald-600" />,
+                onClick: handleExportVencimientosExcel,
+                badge: getVencimientoReport().length || undefined,
+              },
+              {
+                label: 'Vencimientos (PDF)',
+                icon: <FaFilePdf size={16} className="text-rose-500" />,
+                onClick: handleExportVencimientosPdf,
+                badge: getVencimientoReport().length || undefined,
+              },
+            ]}
           />
 
           {canEdit() && selectionMode && selectedIds.length > 0 && viewMode === 'table' && (
@@ -1005,53 +1030,6 @@ export default function FlotaVehicular() {
               Eliminar ({selectedIds.length})
             </button>
           )}
-
-          {/* Reporte de Vencimientos */}
-          <div className="relative w-full md:w-auto" ref={vencimientoMenuRef}>
-            <button
-              onClick={() => setShowVencimientoMenu(v => !v)}
-              className={`w-full md:w-auto flex items-center justify-between gap-2 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${getVencimientoReport().length > 0
-                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-                : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              title="Reporte de vencimientos CITV / SOAT / Póliza"
-            >
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={18} className={getVencimientoReport().length > 0 ? 'text-amber-500' : 'text-slate-400'} />
-                <span className="hidden md:inline">Vencimientos</span>
-                <span className="md:hidden">Reporte Vencimientos</span>
-                {getVencimientoReport().length > 0 && (
-                  <span className="bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                    {getVencimientoReport().length}
-                  </span>
-                )}
-              </div>
-              <ChevronDown size={14} className={`transition-transform ${showVencimientoMenu ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showVencimientoMenu && (
-              <div className="absolute right-0 md:left-auto left-0 top-full mt-2 bg-white border border-slate-200 shadow-2xl z-50 w-full md:min-w-[230px]">
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                  <p className="text-[10px] font-black text-slate-500 tracking-widest">Descargar Reporte</p>
-                  <p className="text-[9px] text-slate-400 mt-0.5">CITV / SOAT / Póliza vencidos o próximos a vencer (30 días)</p>
-                </div>
-                <button
-                  onClick={handleExportVencimientosExcel}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
-                >
-                  <RiFileExcel2Fill size={16} className="text-emerald-600" />
-                  Exportar a Excel
-                </button>
-                <button
-                  onClick={handleExportVencimientosPdf}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-rose-600 hover:bg-rose-50 transition-colors border-t border-slate-50"
-                >
-                  <FaFilePdf size={16} className="text-rose-500" />
-                  Exportar a PDF
-                </button>
-              </div>
-            )}
-          </div>
         </ActionToolbar>
 
         {view === 'form' ? (
@@ -1117,6 +1095,11 @@ export default function FlotaVehicular() {
                           <MapPin size={10} className="text-rose-400 shrink-0" />
                           <span className="truncate">{getEscuelaNombre(v.ubicacion_actual)}</span>
                         </div>
+                        <div className="mt-1.5">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-1.5 py-0.5">
+                            {v.categoria || 'Sin categoría'}
+                          </span>
+                        </div>
                         <div className="flex gap-4 mt-2 text-[10px] flex-wrap">
                           <span className="text-slate-400">CITV: <span className="font-semibold text-slate-600">{v.citv_vencimiento ? new Date(v.citv_vencimiento + 'T12:00:00').toLocaleDateString('es-PE') : '—'}</span></span>
                           <span className="text-slate-400">SOAT: <span className="font-semibold text-slate-600">{v.soat_vencimiento ? new Date(v.soat_vencimiento + 'T12:00:00').toLocaleDateString('es-PE') : '—'}</span></span>
@@ -1147,8 +1130,9 @@ export default function FlotaVehicular() {
                             />
                           </TableHead>
                         )}
-                        <TableHead sortable isSorted={sortConfig?.key === 'placa'} sortDirection={sortConfig?.direction || 'asc'} onClick={() => handleSort('placa')}>Unidad / Placa</TableHead>
+                        <TableHead sortable isSorted={sortConfig?.key === 'placa'} sortDirection={sortConfig?.direction || 'asc'} onClick={() => handleSort('placa')}>Placa</TableHead>
 
+                        <TableHead sortable isSorted={sortConfig?.key === 'categoria'} sortDirection={sortConfig?.direction || 'asc'} onClick={() => handleSort('categoria')}>Categoría</TableHead>
                         <TableHead sortable isSorted={sortConfig?.key === 'ubicacion_actual'} sortDirection={sortConfig?.direction || 'asc'} onClick={() => handleSort('ubicacion_actual')}>Ubicación</TableHead>
                         <TableHead sortable isSorted={sortConfig?.key === 'citv_vencimiento'} sortDirection={sortConfig?.direction || 'asc'} onClick={() => handleSort('citv_vencimiento')}>CITV (Vence)</TableHead>
                         <TableHead sortable isSorted={sortConfig?.key === 'soat_vencimiento'} sortDirection={sortConfig?.direction || 'asc'} onClick={() => handleSort('soat_vencimiento')}>SOAT (Vence)</TableHead>
@@ -1182,6 +1166,10 @@ export default function FlotaVehicular() {
                                 <span className="text-[11px] font-semibold text-slate-400 tracking-wider mt-1">{v.modelo} {v.año ? `(${v.año})` : ''}</span>
                               </div>
                             </div>
+                          </TableCell>
+
+                          <TableCell>
+                            <span className="text-[12px] font-semibold text-slate-600">{v.categoria || '—'}</span>
                           </TableCell>
 
                           <TableCell>
@@ -1262,6 +1250,9 @@ export default function FlotaVehicular() {
                       <div className="mb-4">
                         <h4 className="text-[14px] font-black text-slate-800 leading-none">{v.marca}</h4>
                         <p className="text-[11px] font-semibold text-slate-400 tracking-wider mt-1">{v.modelo} {v.año ? `(${v.año})` : ''}</p>
+                        <span className="inline-block mt-2 text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-1.5 py-0.5">
+                          {v.categoria || 'Sin categoría'}
+                        </span>
                       </div>
 
                       <div className="space-y-4 mb-6">
@@ -1316,13 +1307,13 @@ export default function FlotaVehicular() {
           return (
             <div className={`border ${borderColor} bg-white overflow-hidden`}>
               <div className={`${headerBg} px-3 py-2 flex items-center justify-between border-b ${borderColor}`}>
-                <span className="text-[9px] sm:text-[10px] font-black text-[#002855] tracking-widest">{title}</span>
+                <span className="text-[9px] sm:text-[10px] font-normal text-[#002855] tracking-widest">{title}</span>
                 {daysLeft !== null && renderDocumentStatus(vencimiento)}
               </div>
               <div className="px-3 py-2.5">
                 <div>
-                  <span className="text-[8px] font-black text-slate-400 tracking-widest block mb-1">Vencimiento</span>
-                  <span className="text-[10px] sm:text-[11px] font-black text-slate-700">{fmtLocal(vencimiento) || '—'}</span>
+                  <span className="text-[8px] font-normal text-slate-400 tracking-widest block mb-1">Vencimiento</span>
+                  <span className="text-[10px] sm:text-[11px] font-normal text-slate-700">{fmtLocal(vencimiento) || '—'}</span>
                 </div>
               </div>
             </div>
@@ -1360,12 +1351,16 @@ export default function FlotaVehicular() {
 
             <DetailModalBody>
               {/* Quick info strip */}
-              <div className="grid grid-cols-3 gap-px bg-slate-200 border-b border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-200 border-b border-slate-200">
                 <div className="bg-white p-3 sm:p-4 flex flex-col items-center justify-center text-center">
                   <span className="text-[8px] font-normal text-slate-400 tracking-widest mb-1">Estado</span>
                   <span className={`text-[11px] font-semibold ${statusColors[selectedVehiculo.estado]}`}>
                     {selectedVehiculo.estado === 'en_proceso' ? 'En Proceso' : selectedVehiculo.estado === 'activa' ? 'Activa' : 'Inactiva'}
                   </span>
+                </div>
+                <div className="bg-white p-3 sm:p-4 flex flex-col items-center justify-center text-center">
+                  <span className="text-[8px] font-normal text-slate-400 tracking-widest mb-1">Categoría</span>
+                  <span className="text-[10px] sm:text-[11px] font-normal text-[#002855]">{selectedVehiculo.categoria || '—'}</span>
                 </div>
                 <div className="bg-white p-3 sm:p-4 flex flex-col items-center justify-center text-center">
                   <span className="text-[8px] font-normal text-slate-400 tracking-widest mb-1">Marca / Modelo</span>
@@ -1378,7 +1373,7 @@ export default function FlotaVehicular() {
               </div>
 
               {/* Documents section */}
-              <div className="p-4 sm:p-6 space-y-4">
+              <div className="py-4 sm:py-6 space-y-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Calendar size={14} className="text-[#002855]" />
                   <span className="text-[10px] sm:text-[11px] font-normal text-[#002855] tracking-[0.15em]">Documentación Vehicular</span>

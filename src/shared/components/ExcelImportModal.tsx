@@ -810,7 +810,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onClose, on
                                     <span className="text-xs text-slate-500">Asocia cada hoja del excel a una sede del sistema</span>
                                 </div>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
+                                    <table className="gsc-table w-full text-sm text-left">
                                         <thead className="bg-slate-50 border-b border-slate-200">
                                             <tr>
                                                 <th className="px-6 py-3">Hoja (Excel)</th>
@@ -897,7 +897,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onClose, on
                                         <h5 className="font-normal text-slate-700 text-sm uppercase tracking-wide">Vista Previa de Categorización (Primeros 5 registros)</h5>
                                     </div>
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-[12px] text-left">
+                                        <table className="gsc-table w-full text-[12px] text-left">
                                             <thead className="bg-slate-50 text-slate-500 uppercase font-normal tracking-widest">
                                                 <tr>
                                                     <th className="px-6 py-3">Descripción</th>

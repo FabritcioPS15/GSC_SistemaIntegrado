@@ -146,7 +146,6 @@ export default function Sedes() {
         .delete()
         .eq('id', loc.id)
         .select('id');
-      console.log('[sedes] Resultado delete:', { deletedRows, error });
 
       if (error) {
         if (error.code === '23503') {
@@ -220,7 +219,6 @@ export default function Sedes() {
         .delete()
         .in('id', selectedIds)
         .select('id');
-      console.log('[sedes] Resultado delete por lote:', { deletedRows, error });
 
       if (!error && deletedRows && deletedRows.length > 0) {
         setSelectedIds([]);
@@ -440,10 +438,10 @@ export default function Sedes() {
               selectionMode={
                 canEdit()
                   ? {
-                      active: selectionMode,
-                      onToggle: handleToggleSelectionMode,
-                      selectedCount: selectedIds.length,
-                    }
+                    active: selectionMode,
+                    onToggle: handleToggleSelectionMode,
+                    selectedCount: selectedIds.length,
+                  }
                   : undefined
               }
               onExportExcel={exportToExcel}

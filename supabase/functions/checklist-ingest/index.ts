@@ -52,7 +52,8 @@ interface IngestPayload {
   observaciones: Observacion[];
 }
 
-const CORS_HEADERS = {  "Access-Control-Allow-Origin": "*",
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "content-type, x-api-key",
 };
@@ -143,7 +144,7 @@ async function resolverLocationId(
   if (porColumna.length > 1) {
     console.error(
       `Sede "${sede}" mapeada a ${porColumna.length} registros de locations ` +
-        `(${porColumna.map((c) => c.name).join(" | ")}). Corregir checklist_sede.`,
+      `(${porColumna.map((c) => c.name).join(" | ")}). Corregir checklist_sede.`,
     );
     return null;
   }
@@ -167,7 +168,7 @@ async function resolverLocationId(
 
   console.warn(
     `Sede "${sede}" sin vincular. Correr la migración 20260925000004 o ` +
-      `setear locations.checklist_sede para esa sede.`,
+    `setear locations.checklist_sede para esa sede.`,
   );
 
   return null;

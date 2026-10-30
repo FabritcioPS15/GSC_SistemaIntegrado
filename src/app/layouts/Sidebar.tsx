@@ -207,13 +207,11 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
         { id: 'maintenance', label: 'Mantenimiento', icon: Wrench, path: '/maintenance' },
         { id: 'flota-vehicular', label: 'Flota Vehicular', icon: Car, path: '/flota-vehicular' },
         { id: 'requests', label: 'Solicitudes', icon: FileCheck, path: '/requests' },
-        { id: 'quotations', label: 'Cotizaciones', icon: DollarSign, path: '/quotations' },
       ]
     },
     {
       title: 'Administrativo',
       items: [
-        { id: 'cvs', label: "CV's", icon: FileText, path: '/cvs' },
         { id: 'users', label: 'Usuarios', icon: Users, path: '/users' },
         { id: 'locations', label: 'Sedes', icon: MapPin, path: '/locations' },
         { id: 'companies', label: 'Unidades de Negocio', icon: Building, path: '/companies' },
@@ -303,7 +301,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
             return (
               <div key={section.title} className="mb-1 last:mb-0 px-2">
                 {!collapsed && (
-                  <div className={`px-6 py-2 ${index === 0 ? 'mt-0' : 'mt-2'}`}>
+                  <div className={`py-2 ${index === 0 ? 'mt-0' : 'mt-2'}`}>
                     <div className="h-[1px] w-full bg-white/10" />
                   </div>
                 )}
@@ -314,7 +312,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
                     const isSubmenuOpen = openSubmenus.has(item.id);
 
                     return (
-                      <div key={item.id} className="relative px-2 mb-0.5 last:mb-0">
+                      <div key={item.id} className="relative mb-0.5 last:mb-0">
                         <NavLink
                           to={item.path}
                           onMouseEnter={(e) => handleMouseEnter(item.id, e)}
@@ -330,7 +328,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
                           className={({ isActive }) => `
                             relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group/link
                             ${isActive
-                              ? 'bg-blue-600/20 text-white font-bold border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                              ? 'bg-blue-600/20 text-white font-medium border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
                               : 'text-slate-300 hover:text-white hover:bg-white/10'}
                             ${collapsed ? 'justify-center px-0 h-12' : ''}
                           `}
@@ -357,7 +355,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
 
                           {/* Minimal Active Indicator */}
                           {isActive && !collapsed && (
-                            <div className="absolute left-[-10px] top-1/2 -translate-y-1/2 w-1.5 h-6 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
                           )}
                         </NavLink>
 
@@ -373,8 +371,8 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
                             className="fixed left-[72px] w-64 bg-[#001529] border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[999] py-3 animate-in fade-in slide-in-from-left-4 duration-200 backdrop-blur-xl"
                             style={{ top: adjustedTop }}
                           >
-                            <div className="px-4 py-2 border-b border-white/5 mb-2">
-                              <span className="text-[12px] font-black text-blue-400 tracking-widest">{item.label}</span>
+                            <div className="px-3 py-2 border-b border-white/5 mb-2">
+                              <span className="text-[12px] font-medium text-blue-400 tracking-widest">{item.label}</span>
                             </div>
                             <div className="px-2 space-y-1">
                               {item.id === 'checklist' ? (
@@ -423,17 +421,17 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
                         {/* ACCORDION (Expanded Mode) - Con Efecto Flotante */}
                         {item.hasSubmenu && !collapsed && (
                           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSubmenuOpen ? 'max-h-[500px] mt-1 mb-2 opacity-100' : 'max-h-0 opacity-0'}`}>
-                            <div className="ml-4 mr-2 bg-black/20 rounded-xl py-1 px-1 border border-white/5 shadow-inner backdrop-blur-sm">
+                            <div className="bg-black/20 rounded-xl py-1 border border-white/5 shadow-inner backdrop-blur-sm">
                               {item.submenu?.map(sub => (
                                 <NavLink
                                   key={sub.id}
                                   to={sub.path}
                                   onClick={() => window.innerWidth < 1024 && onCloseMobile?.()}
                                   className={({ isActive }) => `
-                                                relative flex items-center gap-3 px-4 py-2 text-[15px] font-medium tracking-wide rounded-lg transition-all mb-0.5 last:mb-0
+                                                relative flex items-center gap-3 px-3 py-2 text-[15px] font-medium tracking-wide rounded-lg transition-all mb-0.5 last:mb-0
                                                 ${isActive
-                                      ? 'text-white bg-blue-600/30 shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/10 translate-x-1'
-                                      : 'text-slate-400 hover:text-white hover:bg-white/10 hover:translate-x-1'}
+                                      ? 'text-white bg-blue-600/30 shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/10'
+                                      : 'text-slate-400 hover:text-white hover:bg-white/10'}
                                             `}
                                 >
                                   <div className={`w-1.5 h-1.5 rounded-full transition-all ${isActive ? 'bg-blue-400 scale-125 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-slate-600'}`} />
@@ -453,7 +451,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
         </div>
 
         <div className="p-4 bg-black/30 border-t border-white/5 shrink-0 flex flex-col gap-4">
-          <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2 text-[10px] font-black text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all tracking-[2px] ${collapsed ? 'px-0' : 'px-4'}`}>
+          <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2 text-[10px] font-medium text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all tracking-[2px] ${collapsed ? 'px-0' : 'px-4'}`}>
             <LogOut size={16} /> {!collapsed && 'SALIR'}
           </button>
         </div>

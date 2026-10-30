@@ -103,6 +103,16 @@
   tbody tr:nth-child(even):not(:hover) {
     background-color: #f1f5f9; /* Más oscuro para notar la diferencia (slate-100) */
   }
+
+  /* Tamaño único de texto en tablas (referencia: columna Ubicación de Flota Vehicular) */
+  .gsc-table thead th {
+    font-size: 12px;
+  }
+
+  .gsc-table tbody td,
+  .gsc-table tbody td * {
+    font-size: 13px;
+  }
 }
 
 @layer utilities {
