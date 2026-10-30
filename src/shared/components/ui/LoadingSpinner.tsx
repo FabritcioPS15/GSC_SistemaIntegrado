@@ -7,9 +7,9 @@ interface LoadingSpinnerProps {
   size?: number;
   /** Clases adicionales para el contenedor */
   className?: string;
-  /** Color del anillo exterior. Default: #fff */
+  /** Color del anillo exterior. Default: rgba(0, 40, 85, 0.15) */
   color1?: string;
-  /** Color del anillo interior. Default: #ff3d00 */
+  /** Color del anillo interior. Default: #002855 */
   color2?: string;
   /** Texto opcional debajo del loader */
   label?: string;
@@ -25,8 +25,8 @@ export default function LoadingSpinner({
   minHeight = '60vh',
   size = 64,
   className = '',
-  color1,
-  color2,
+  color1 = 'rgba(0, 40, 85, 0.15)',
+  color2 = '#002855',
   label,
   labelClassName = 'mt-4 text-sm text-slate-600',
 }: LoadingSpinnerProps) {

@@ -4,8 +4,8 @@
 
 @layer components {
   .gs-loader {
-    --color-1: #fff;
-    --color-2: #ff3d00;
+    --color-1: color-mix(in srgb, currentColor 20%, transparent);
+    --color-2: currentColor;
     --size: 1px;
 
     width: calc(48 * var(--size));

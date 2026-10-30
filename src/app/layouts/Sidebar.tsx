@@ -25,6 +25,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Ticket,
   ClipboardList,
   Building2,
@@ -39,7 +40,12 @@ import {
   BarChart3,
   DollarSign,
   FolderOpen,
-  ExternalLink
+  ExternalLink,
+  LayoutGrid,
+  Activity,
+  Truck,
+  Briefcase,
+  Settings
 } from 'lucide-react';
 import { GiCctvCamera } from 'react-icons/gi';
 import { Trash2 } from 'lucide-react';
@@ -54,6 +60,9 @@ interface SubmenuItem {
   submenu?: SubmenuItem[];
   /** Los items estructurales no muestran el botón de eliminar. */
   noDelete?: boolean;
+  /** Si es true, el item se abre en una nueva pestaña (enlace externo). */
+  external?: boolean;
+  permissionId?: string;
 }
 
 interface MenuItem {
@@ -70,6 +79,7 @@ interface MenuItem {
 
 interface Section {
   title: string;
+  icon: any;
   items: MenuItem[];
 }
 
@@ -95,6 +105,28 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
   };
   const { hasPermission, logout } = useAuth();
   const [openSubmenus, setOpenSubmenus] = useState<Set<string>>(new Set());
+  const [closedSections, setClosedSections] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('gsc-sidebar-closed-sections');
+      return new Set<string>(stored ? JSON.parse(stored) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
+
+  const toggleSection = (title: string) => {
+    setClosedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      try {
+        localStorage.setItem('gsc-sidebar-closed-sections', JSON.stringify([...next]));
+      } catch {
+        // Si el navegador bloquea el almacenamiento, el estado sigue funcionando en memoria.
+      }
+      return next;
+    });
+  };
   const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [menuTop, setMenuTop] = useState<number>(0);
@@ -145,6 +177,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
   const sections: Section[] = [
     {
       title: 'Principal',
+      icon: LayoutGrid,
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/' },
         {
@@ -178,6 +211,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
     },
     {
       title: 'Operativo',
+      icon: Activity,
       items: [
         {
           id: 'inventory',
@@ -215,24 +249,47 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
       ]
     },
     {
+      title: 'SUTRAN',
+      icon: Truck,
+      items: [
+        { id: 'sutran', label: 'Sutran', icon: Building2, path: '/sutran' },
+        {
+          id: 'sutran-folder',
+          label: 'Folders SUTRAN',
+          icon: FolderOpen,
+          path: '#',
+          permissionId: 'sutran',
+          hasSubmenu: true,
+          submenu: [
+            {
+              id: 'folder-ecsal',
+              label: 'ECSAL',
+              path: 'https://docs.google.com/spreadsheets/d/14Y03Rte9okL6lrqmgvBi2cJOVrQSGry9ALHskKlC_jo/edit?gid=1923023795#gid=1923023795',
+              permissionId: 'sutran',
+              external: true,
+            },
+            {
+              id: 'folder-escon',
+              label: 'ESCON',
+              path: 'https://docs.google.com/spreadsheets/d/1q9VILTgU3sQey9pJpHbvvbMwMytrLF1gai-LLe8ZAfs/edit?gid=847590788#gid=847590788',
+              permissionId: 'sutran',
+              external: true,
+            },
+          ],
+        },
+        { id: 'mtc', label: 'MTC Accesos', icon: Key, path: '/mtc' },
+        { id: 'titulos-habilitantes', label: 'Títulos Habilitantes', icon: Award, path: '/titulos-habilitantes' },
+        { id: 'planos-defensa-civil', label: 'Planos Defensa Civil', icon: Map, path: '/planos-defensa-civil' },
+      ]
+    },
+    {
       title: 'Administrativo',
+      icon: Briefcase,
       items: [
         { id: 'users', label: 'Usuarios', icon: Users, path: '/users' },
         { id: 'locations', label: 'Sedes', icon: MapPin, path: '/locations' },
         { id: 'companies', label: 'Unidades de Negocio', icon: Building, path: '/companies' },
-        { id: 'sutran', label: 'Sutran', icon: Building2, path: '/sutran' },
-        {
-          id: 'sutran-folder',
-          label: 'Folder SUTRAN',
-          icon: FolderOpen,
-          path: 'https://docs.google.com/spreadsheets/d/1q9VILTgU3sQey9pJpHbvvbMwMytrLF1gai-LLe8ZAfs/edit?gid=847590788#gid=847590788',
-          permissionId: 'sutran',
-          external: true,
-        },
-        { id: 'mtc', label: 'MTC Accesos', icon: Key, path: '/mtc' },
         { id: 'servers', label: 'Servidores', icon: GrServerCluster, path: '/servers' },
-        { id: 'titulos-habilitantes', label: 'Títulos Habilitantes', icon: Award, path: '/titulos-habilitantes' },
-        { id: 'planos-defensa-civil', label: 'Planos Defensa Civil', icon: Map, path: '/planos-defensa-civil' },
         {
           id: 'sent',
           label: 'Enviados',
@@ -248,6 +305,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
     },
     {
       title: 'Sistema',
+      icon: Settings,
       items: [
         { id: 'reports', label: 'Reportes', icon: BarChart3, path: '/reports' },
         { id: 'audit', label: 'Auditoría', icon: FileText, path: '/audit' },
@@ -302,194 +360,255 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
         </div>
 
         <div className="flex-1 overflow-y-auto sidebar-scroll py-2 flex flex-col">
-          {sections.map((section, index) => {
+          {sections.map(section => {
             const filteredItems = section.items.filter(item => {
               if (!hasPermission(item.permissionId ?? item.id)) return false;
-              if (item.submenu) return item.submenu.some(sub => hasPermission(sub.id));
+              if (item.submenu) return item.submenu.some(sub => hasPermission(sub.permissionId ?? sub.id));
               return true;
             });
 
             if (filteredItems.length === 0) return null;
 
+            const isClosed = closedSections.has(section.title);
+            const sectionHasActive = filteredItems.some(item => !item.external && isPathActive(item.path));
+            const SectionIcon = section.icon;
+
             return (
               <div key={section.title} className="mb-1 last:mb-0 px-2">
                 {!collapsed && (
-                  <div className={`py-2 ${index === 0 ? 'mt-0' : 'mt-2'}`}>
-                    <div className="h-[1px] w-full bg-white/10" />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.title)}
+                    aria-expanded={!isClosed}
+                    className="group/section flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/60"
+                  >
+                    <span
+                      className={`h-px flex-1 transition-colors duration-200 ${isClosed ? 'bg-gradient-to-r from-transparent to-white/10' : 'bg-gradient-to-r from-transparent to-white/20'}`}
+                    />
+                    <SectionIcon
+                      size={12}
+                      className={`shrink-0 transition-colors duration-200 ${isClosed && sectionHasActive ? 'text-slate-400' : 'text-slate-600 group-hover/section:text-slate-400'}`}
+                    />
+                    <span
+                      className={`whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.18em] transition-colors duration-200 ${isClosed && sectionHasActive ? 'text-slate-300' : 'text-slate-500 group-hover/section:text-slate-300'}`}
+                    >
+                      {section.title}
+                    </span>
+                    {isClosed && sectionHasActive && (
+                      <span className="h-1 w-1 shrink-0 rounded-full bg-blue-400" />
+                    )}
+                    <ChevronDown
+                      size={11}
+                      className={`shrink-0 text-slate-600 transition-all duration-200 group-hover/section:text-slate-400 ${isClosed ? '-rotate-90' : ''}`}
+                    />
+                    <span
+                      className={`h-px flex-1 transition-colors duration-200 ${isClosed ? 'bg-gradient-to-l from-transparent to-white/10' : 'bg-gradient-to-l from-transparent to-white/20'}`}
+                    />
+                  </button>
                 )}
-                <div className="space-y-1">
-                  {filteredItems.map(item => {
-                    const Icon = item.icon;
+                {(!isClosed || collapsed) && (
+                  <div className="space-y-1">
+                    {filteredItems.map(item => {
+                      const Icon = item.icon;
 
-                    if (item.external) {
-                      return (
-                        <div key={item.id} className="relative mb-0.5 last:mb-0">
-                          <a
-                            href={item.path}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => { if (window.innerWidth < 1024) onCloseMobile?.(); }}
-                            className={`
+                      if (item.external) {
+                        return (
+                          <div key={item.id} className="relative mb-0.5 last:mb-0">
+                            <a
+                              href={item.path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => { if (window.innerWidth < 1024) onCloseMobile?.(); }}
+                              className={`
                               relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group/link
                               text-slate-300 hover:text-white hover:bg-white/10
                               ${collapsed ? 'justify-center px-0 h-12' : ''}
                             `}
+                            >
+                              <Icon
+                                size={collapsed ? 24 : 20}
+                                className="shrink-0 transition-transform duration-200 text-slate-400 group-hover/link:text-white group-hover/link:scale-110"
+                              />
+                              {!collapsed && (
+                                <>
+                                  <span className="text-[16px] font-medium tracking-wide flex-1 truncate">
+                                    {item.label}
+                                  </span>
+                                  <ExternalLink size={14} className="opacity-30 group-hover/link:opacity-100" />
+                                </>
+                              )}
+                            </a>
+                          </div>
+                        );
+                      }
+
+                      const isActive = isPathActive(item.path);
+                      const isSubmenuOpen = openSubmenus.has(item.id);
+
+                      return (
+                        <div key={item.id} className="relative mb-0.5 last:mb-0">
+                          <NavLink
+                            to={item.path}
+                            onMouseEnter={(e) => handleMouseEnter(item.id, e)}
+                            onMouseLeave={handleMouseLeave}
+                            onClick={(e) => {
+                              if (item.hasSubmenu && (!collapsed || window.innerWidth < 1024)) {
+                                toggleSubmenu(item.id, e);
+                              } else {
+                                if (window.innerWidth < 1024) onCloseMobile?.();
+                                setHoveredItem(null);
+                              }
+                            }}
+                            className={({ isActive }) => `
+                            relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group/link
+                            ${isActive
+                                ? 'bg-blue-600/20 text-white font-medium border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                                : 'text-slate-300 hover:text-white hover:bg-white/10'}
+                            ${collapsed ? 'justify-center px-0 h-12' : ''}
+                          `}
                           >
+                            {/* Icon */}
                             <Icon
                               size={collapsed ? 24 : 20}
-                              className="shrink-0 transition-transform duration-200 text-slate-400 group-hover/link:text-white group-hover/link:scale-110"
+                              className={`shrink-0 transition-transform duration-200 ${isActive ? 'text-blue-400' : 'text-slate-400 group-hover/link:text-white group-hover/link:scale-110'}`}
                             />
+
                             {!collapsed && (
                               <>
                                 <span className="text-[16px] font-medium tracking-wide flex-1 truncate">
                                   {item.label}
                                 </span>
-                                <ExternalLink size={14} className="opacity-30 group-hover/link:opacity-100" />
+                                {item.hasSubmenu && (
+                                  <ChevronRight
+                                    size={16}
+                                    className={`transition-transform duration-200 opacity-30 group-hover/link:opacity-100 ${isSubmenuOpen ? 'rotate-90' : ''}`}
+                                  />
+                                )}
                               </>
                             )}
-                          </a>
-                        </div>
-                      );
-                    }
 
-                    const isActive = isPathActive(item.path);
-                    const isSubmenuOpen = openSubmenus.has(item.id);
+                            {/* Minimal Active Indicator */}
+                            {isActive && !collapsed && (
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
+                            )}
+                          </NavLink>
 
-                    return (
-                      <div key={item.id} className="relative mb-0.5 last:mb-0">
-                        <NavLink
-                          to={item.path}
-                          onMouseEnter={(e) => handleMouseEnter(item.id, e)}
-                          onMouseLeave={handleMouseLeave}
-                          onClick={(e) => {
-                            if (item.hasSubmenu && (!collapsed || window.innerWidth < 1024)) {
-                              toggleSubmenu(item.id, e);
-                            } else {
-                              if (window.innerWidth < 1024) onCloseMobile?.();
-                              setHoveredItem(null);
-                            }
-                          }}
-                          className={({ isActive }) => `
-                            relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group/link
-                            ${isActive
-                              ? 'bg-blue-600/20 text-white font-medium border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                              : 'text-slate-300 hover:text-white hover:bg-white/10'}
-                            ${collapsed ? 'justify-center px-0 h-12' : ''}
-                          `}
-                        >
-                          {/* Icon */}
-                          <Icon
-                            size={collapsed ? 24 : 20}
-                            className={`shrink-0 transition-transform duration-200 ${isActive ? 'text-blue-400' : 'text-slate-400 group-hover/link:text-white group-hover/link:scale-110'}`}
-                          />
-
-                          {!collapsed && (
-                            <>
-                              <span className="text-[16px] font-medium tracking-wide flex-1 truncate">
-                                {item.label}
-                              </span>
-                              {item.hasSubmenu && (
-                                <ChevronRight
-                                  size={16}
-                                  className={`transition-transform duration-200 opacity-30 group-hover/link:opacity-100 ${isSubmenuOpen ? 'rotate-90' : ''}`}
-                                />
-                              )}
-                            </>
-                          )}
-
-                          {/* Minimal Active Indicator */}
-                          {isActive && !collapsed && (
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-blue-500 rounded-r-full shadow-[0_0_12px_rgba(59,130,246,0.6)]" />
-                          )}
-                        </NavLink>
-
-                        {/* Hover Flyout for Collapsed Mode */}
-                        {collapsed && hoveredItem === item.id && item.hasSubmenu && (
-                          <div
-                            ref={subMenuRef}
-                            onMouseEnter={() => {
-                              if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-                              setHoveredItem(item.id);
-                            }}
-                            onMouseLeave={handleMouseLeave}
-                            className="fixed left-[72px] w-64 bg-[#001529] border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[999] py-3 animate-in fade-in slide-in-from-left-4 duration-200 backdrop-blur-xl"
-                            style={{ top: adjustedTop }}
-                          >
-                            <div className="px-3 py-2 border-b border-white/5 mb-2">
-                              <span className="text-[12px] font-medium text-blue-400 tracking-widest">{item.label}</span>
-                            </div>
-                            <div className="px-2 space-y-1">
-                              {item.id === 'checklist' ? (
-                                checklistItems.map(sub => (
-                                  <div key={sub.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5">
-                                    <NavLink
-                                      to={sub.path}
-                                      className={({ isActive }) => `
+                          {/* Hover Flyout for Collapsed Mode */}
+                          {collapsed && hoveredItem === item.id && item.hasSubmenu && (
+                            <div
+                              ref={subMenuRef}
+                              onMouseEnter={() => {
+                                if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+                                setHoveredItem(item.id);
+                              }}
+                              onMouseLeave={handleMouseLeave}
+                              className="fixed left-[72px] w-64 bg-[#001529] border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[999] py-3 animate-in fade-in slide-in-from-left-4 duration-200 backdrop-blur-xl"
+                              style={{ top: adjustedTop }}
+                            >
+                              <div className="px-3 py-2 border-b border-white/5 mb-2">
+                                <span className="text-[12px] font-medium text-blue-400 tracking-widest">{item.label}</span>
+                              </div>
+                              <div className="px-2 space-y-1">
+                                {item.id === 'checklist' ? (
+                                  checklistItems.map(sub => (
+                                    <div key={sub.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5">
+                                      <NavLink
+                                        to={sub.path}
+                                        className={({ isActive }) => `
                                         flex items-center gap-3 text-[15px] font-medium transition-all
                                         ${isActive ? 'bg-blue-600/20 text-white' : 'text-slate-400 hover:text-white'}
                                       `}
-                                    >
-                                      <div className={`w-1 h-1 rounded-full ${sub.path === location.pathname ? 'bg-blue-400' : 'bg-slate-600'}`} />
-                                      {sub.label}
-                                    </NavLink>
-                                    {!sub.noDelete && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteChecklistItem(sub.id); }}
-                                        className="p-1 hover:text-red-400"
-                                        aria-label={`Eliminar ${sub.label}`}
                                       >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-                                  </div>
-                                ))
-                              ) : (
-                                item.submenu?.map(sub => (
-                                  <NavLink
-                                    key={sub.id}
-                                    to={sub.path}
-                                    className={({ isActive }) => `
+                                        <div className={`w-1 h-1 rounded-full ${sub.path === location.pathname ? 'bg-blue-400' : 'bg-slate-600'}`} />
+                                        {sub.label}
+                                      </NavLink>
+                                      {!sub.noDelete && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDeleteChecklistItem(sub.id); }}
+                                          className="p-1 hover:text-red-400"
+                                          aria-label={`Eliminar ${sub.label}`}
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))
+                                ) : (
+                                  item.submenu?.map(sub => (
+                                    sub.external ? (
+                                      <a
+                                        key={sub.id}
+                                        href={sub.path}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-[15px] font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                                      >
+                                        <div className="w-1 h-1 rounded-full bg-slate-600" />
+                                        {sub.label}
+                                        <ExternalLink size={12} className="ml-auto opacity-40" />
+                                      </a>
+                                    ) : (
+                                      <NavLink
+                                        key={sub.id}
+                                        to={sub.path}
+                                        className={({ isActive }) => `
                                       flex items-center gap-3 px-3 py-2 rounded-lg text-[15px] font-medium transition-all
                                       ${isActive ? 'bg-blue-600/20 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}
                                     `}
-                                  >
-                                    <div className={`w-1 h-1 rounded-full ${sub.path === location.pathname ? 'bg-blue-400' : 'bg-slate-600'}`} />
-                                    {sub.label}
-                                  </NavLink>
-                                ))
-                              )}
+                                      >
+                                        <div className={`w-1 h-1 rounded-full ${sub.path === location.pathname ? 'bg-blue-400' : 'bg-slate-600'}`} />
+                                        {sub.label}
+                                      </NavLink>
+                                    )
+                                  ))
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {/* ACCORDION (Expanded Mode) - Con Efecto Flotante */}
-                        {item.hasSubmenu && !collapsed && (
-                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSubmenuOpen ? 'max-h-[500px] mt-1 mb-2 opacity-100' : 'max-h-0 opacity-0'}`}>
-                            <div className="bg-black/20 rounded-xl py-1 border border-white/5 shadow-inner backdrop-blur-sm">
-                              {item.submenu?.map(sub => (
-                                <NavLink
-                                  key={sub.id}
-                                  to={sub.path}
-                                  onClick={() => window.innerWidth < 1024 && onCloseMobile?.()}
-                                  className={({ isActive }) => `
+                          {/* ACCORDION (Expanded Mode) - Con Efecto Flotante */}
+                          {item.hasSubmenu && !collapsed && (
+                            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSubmenuOpen ? 'max-h-[500px] mt-1 mb-2 opacity-100' : 'max-h-0 opacity-0'}`}>
+                              <div className="bg-black/20 rounded-xl py-1 border border-white/5 shadow-inner backdrop-blur-sm">
+                                {item.submenu?.map(sub => (
+                                  sub.external ? (
+                                    <a
+                                      key={sub.id}
+                                      href={sub.path}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => window.innerWidth < 1024 && onCloseMobile?.()}
+                                      className="relative flex items-center gap-3 px-3 py-2 text-[15px] font-medium tracking-wide rounded-lg transition-all mb-0.5 last:mb-0 text-slate-400 hover:text-white hover:bg-white/10"
+                                    >
+                                      <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                                      {sub.label}
+                                      <ExternalLink size={12} className="ml-auto opacity-40" />
+                                    </a>
+                                  ) : (
+                                    <NavLink
+                                      key={sub.id}
+                                      to={sub.path}
+                                      onClick={() => window.innerWidth < 1024 && onCloseMobile?.()}
+                                      className={({ isActive }) => `
                                                 relative flex items-center gap-3 px-3 py-2 text-[15px] font-medium tracking-wide rounded-lg transition-all mb-0.5 last:mb-0
                                                 ${isActive
-                                      ? 'text-white bg-blue-600/30 shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/10'
-                                      : 'text-slate-400 hover:text-white hover:bg-white/10'}
+                                        ? 'text-white bg-blue-600/30 shadow-[0_4px_12px_rgba(0,0,0,0.3)] border border-white/10'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/10'}
                                             `}
-                                >
-                                  <div className={`w-1.5 h-1.5 rounded-full transition-all ${isActive ? 'bg-blue-400 scale-125 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-slate-600'}`} />
-                                  {sub.label}
-                                </NavLink>
-                              ))}
+                                    >
+                                      <div className={`w-1.5 h-1.5 rounded-full transition-all ${isActive ? 'bg-blue-400 scale-125 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-slate-600'}`} />
+                                      {sub.label}
+                                    </NavLink>
+                                  )
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
